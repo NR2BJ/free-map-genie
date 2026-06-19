@@ -21,9 +21,9 @@ Tested manually on:
 Use the latest GitHub release assets:
 
 - `fmg-3.0.0-chrome.zip` for Chrome / Chromium browsers.
-- `fmg-3.0.0-firefox-unsigned.xpi` for Firefox signing or temporary testing.
+- `fmg-3.0.0-firefox.xpi` for Firefox.
 
-Firefox release/beta builds require Mozilla signing. Upload the Firefox XPI to AMO for signing, then replace the unsigned release asset with Mozilla's signed XPI before treating it as a normal installable release.
+The Firefox XPI in the release is signed by Mozilla for the fork-specific add-on ID.
 
 ## Firefox Notes
 
