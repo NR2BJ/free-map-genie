@@ -1,85 +1,68 @@
-<p align="center">
-    <img src="./assets/logo.png" />
-    <h1 align="center">FMG: Free <a href="https://mapgenie.io">Mapgenie</a> PRO!</h1>
-</p>
+# Free Map Genie - NR2BJ Fork
 
-<p align="center">
-    <strong>🚧 FMG V3 - Work in Progress 🚧</strong>
-    <br/>
-    <a href="https://github.com/V1P3R-FMG/free-map-genie/releases/tag/v3.0.0-beta">⬇️🧪 V3 Download</a>
-</p>
+This is a maintained fork of Free Map Genie for the current MapGenie v3 site.
 
-## About
+The fork is based on the FMG 3.0.0 beta codebase and includes compatibility fixes for the newer MapGenie page boot flow, Firefox add-on signing requirements, and Chrome/Firefox package builds.
 
-FMG (Free Map Genie) is a browser extension that enhances the [Mapgenie.io](https://mapgenie.io) experience by unlocking PRO features for free. Version 3 is a complete rewrite from scratch.
+## Status
 
-> [!WARNING]
-> FMG V3 is actively under development and uses a new data saving approach. Do not clone and use this branch without a backup as there is a possibility of data corruption or loss.
+- MapGenie v3 map pages boot correctly again.
+- Pro UI restrictions are unlocked by the extension.
+- Saved FMG checklist data is loaded from the local FMG IndexedDB database.
+- Chrome and Firefox packages are built from the same source tree.
+- Firefox uses a fork-specific add-on ID: `free-map-genie-nr2bj@nr2bj.github.io`.
 
-## ✨ Pro Features unlock state
+Tested manually on:
 
-| Feature               | Unlocked |
-| --------------------- | -------- |
-| **locations**         | ✔️       |
-| **track categories**  | ✔️       |
-| **presets**           | ✔️       |
-| **notes**             | ✔️       |
-| **tarkov quest tool** | ✔️       |
-| **pro maps**          | ✔️       |
-| **heatmaps**          | ✔️       |
-| **guides**            | ✔️       |
+- `https://mapgenie.io/cloudheim/maps/world`
 
-## 🚀 What's New in V3 for developers
+## Downloads
 
-### Build System & Development
+Use the latest GitHub release assets:
 
-- **Modern Build System**: Migrated from [Webpack](https://webpack.js.org/) to [WXT](https://wxt.dev/)
-  - WXT is specifically designed for web extensions, making development and building much cleaner
-- **End-to-End Testing**: Integrated [Playwright](https://playwright.dev/) for comprehensive E2E testing
+- `fmg-3.0.0-chrome.zip` for Chrome / Chromium browsers.
+- `fmg-3.0.0-firefox-unsigned.xpi` for Firefox signing or temporary testing.
 
-### Architecture Improvements
+Firefox release/beta builds require Mozilla signing. Upload the Firefox XPI to AMO for signing, then replace the unsigned release asset with Mozilla's signed XPI before treating it as a normal installable release.
 
-- **Enhanced Request Interceptor**: New [request interceptor](./src/common/axios/interceptor.ts) using [Axios Interceptors](https://axios-http.com/docs/interceptors)
-- **Modern Messaging System**: Complete rewrite of the [messaging system](./src/common/messaging/) with type safety and memoization
-  - Organized into [services](./src/services) for better grouping of functionality
-  - Each service has a `use` and `provide` method.
-  - Services behave like normal JavaScript objects, with automatic conversion to invoke requests
+## Firefox Notes
 
-### Backend Simulation
+The Firefox manifest declares:
 
-- **Simulated Backend**: FMG now includes a backend simulation for cleaner page scripts
-  - Page scripts only forward API requests to the backend
-  - Page scripts are no longer responsible for data saving
-
-### Database & Storage
-
-- **Modern Database**: Switched to [Dexie](https://dexie.org/) using IndexedDB under the hood
-  - More similar to traditional backend databases
-  - Comes with a challenge we need to migrate legacy localStorage data to our new dexie database
-- **Client**: New [Client class](./src/common/client.ts) automatically intercepts and forwards requests
-  - Handles locations, categories, presets, and notes automatically
-  - Cleaner map and guide scripts
-
-## 📁 Project Structure
-
-```
-├── src/
-│   ├── common/          # Shared utilities and modules
-│   │   ├── axios/       # Axios related utils and interceptor
-│   │   └── messaging/   # Type-safe messaging system
-│   ├── contexts/        # Extension contexts (background, content, popup)
-│   ├── services/        # Services using the message system
-│   ├── types/           # TypeScript type definitions
-│   ├── utils/           # Helper utilities
-│   └── assets/          # Static assets
-├── modules/             # Wxt modules
-├── icons/               # icons for fmg-icon font
-├── e2e/                 # End-to-end tests
-└── public/              # Public assets
+```json
+{
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "free-map-genie-nr2bj@nr2bj.github.io",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  }
+}
 ```
 
----
+AMO may show warnings such as `Unsafe assignment to innerHTML` or `The Function constructor is eval` for bundled/minified dependency code. The current package passes validation with zero errors; those warnings are not signing blockers.
 
-<p align="center">
-    Made with ❤️ by <a href="https://github.com/V1P3R-FMG">V1P3R</a>
-</p>
+## Local Data
+
+FMG save data is stored in the MapGenie page's IndexedDB database named `fmg:database`.
+
+Temporary add-on reloads should not erase this data. Clearing site data, using a different Firefox profile/container, or deleting the browser profile can remove or hide it.
+
+## Build
+
+This project uses WXT.
+
+```powershell
+node .\node_modules\wxt\bin\wxt.mjs zip -b chrome
+node .\node_modules\wxt\bin\wxt.mjs zip -b firefox
+```
+
+The build reads MapGenie domains during packaging.
+
+## Credits
+
+Original project: [V1P3R-FMG/free-map-genie](https://github.com/V1P3R-FMG/free-map-genie)
+
+Chrome compatibility patch reference: [HicH987/free-map-genie](https://github.com/HicH987/free-map-genie)
