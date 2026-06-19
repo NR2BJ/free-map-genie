@@ -6,13 +6,10 @@
   - Upload this ZIP to the Chrome Web Store Developer Dashboard.
   - For manual testing, unzip it and load the folder from `chrome://extensions` with Developer mode enabled.
 
-- `fmg-3.0.0-firefox-amo-upload.zip`
-  - Upload this ZIP to AMO Developer Hub for signing.
+- `fmg-3.0.0-firefox-unsigned.xpi`
+  - Upload this XPI to AMO Developer Hub for signing.
   - Choose listed distribution if you want it on addons.mozilla.org.
   - Choose unlisted/self-distribution if you want to host the signed XPI yourself, for example on GitHub Releases.
-
-- `fmg-3.0.0-firefox-unsigned.xpi`
-  - This is the same Firefox build with an `.xpi` extension.
   - It is not signed by Mozilla. Normal Firefox release builds may reject it.
   - After AMO signing, replace this with the signed XPI from Mozilla before publishing it as a direct-install GitHub release asset.
 

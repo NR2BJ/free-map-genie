@@ -89,6 +89,9 @@ export default defineConfig({
         : {
             gecko: {
               id: "viper-fmg@freemapgenie.com",
+              data_collection_permissions: {
+                required: ["none"],
+              },
             },
           },
   }),
