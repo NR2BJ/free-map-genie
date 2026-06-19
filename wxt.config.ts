@@ -59,7 +59,11 @@ export default defineConfig({
     inputDir: "icons",
   },
   manifest: ({ browser, manifestVersion }) => ({
-    host_permissions: ["*://mapgenie.io/*", "*://cdn.mapgenie.io/*"],
+    host_permissions: [
+      "*://mapgenie.io/*",
+      "*://www.mapgenie.io/*",
+      "*://cdn.mapgenie.io/*",
+    ],
     web_accessible_resources: [
       {
         matches: ["<mapgenie_domains>"],

@@ -6,9 +6,18 @@ export const Setting = (props: Setting.Props) => {
   const [loading, setLoading] = React.useState(true);
   const [enabled, setEnabled] = useState(false);
 
+  const readEnabled = () => {
+    try {
+      return props.setting.enabled;
+    } catch (error) {
+      logger.warn("Could not read setting state.", error);
+      return false;
+    }
+  };
+
   React.useEffect(() => {
     props.setting.onLoaded(() => {
-      setEnabled(props.setting.enabled);
+      setEnabled(readEnabled());
       setLoading(false);
     });
   }, [props.setting]);
@@ -21,7 +30,7 @@ export const Setting = (props: Setting.Props) => {
     });
   };
 
-  if (!props.setting.applicable) {
+  if (props.setting.failed || !props.setting.applicable) {
     return null;
   }
 

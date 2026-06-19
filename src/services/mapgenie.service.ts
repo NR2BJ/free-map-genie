@@ -22,6 +22,11 @@ class MapgenieService {
     }
   );
 
+  private isUnavailable(error: unknown) {
+    if (!axios.isAxiosError(error)) return false;
+    return error.response?.status === 403 || error.response?.status === 404;
+  }
+
   public async fetchUser(gameId: number | string) {
     const auth = await this.backend.getAuthToken();
     const { data } = await this.axios.get<MG.Api.UserFull>("/user/full", {
@@ -43,11 +48,37 @@ class MapgenieService {
   }
 
   @Memoize()
-  public async fetchGame(gameId: number | string) {
-    const { data } = await this.axios.get<MG.Api.GameFull>(
-      `/games/${gameId}/full`
-    );
-    return data;
+  public async fetchGameInfo(gameId: number | string) {
+    const games = await this.fetchGames();
+    const game = games.find((g) => String(g.id) === String(gameId));
+    if (!game) {
+      throw new Error(`Game with ID "${gameId}" not found`);
+    }
+    return game;
+  }
+
+  @Memoize()
+  public async fetchGame(gameId: number | string): Promise<MG.Api.GameFull> {
+    try {
+      const { data } = await this.axios.get<MG.Api.GameFull>(
+        `/games/${gameId}/full`
+      );
+      return data;
+    } catch (error) {
+      if (!this.isUnavailable(error)) throw error;
+
+      logger.warn(
+        `Falling back to games list because full game API is unavailable for ${gameId}.`,
+        error
+      );
+
+      const game = await this.fetchGameInfo(gameId);
+      return {
+        ...game,
+        maps: game.maps as unknown as MG.Api.MapFullForGame[],
+        default_presets: [],
+      };
+    }
   }
 
   @Memoize()
@@ -60,26 +91,32 @@ class MapgenieService {
 
   @Memoize()
   public async fetchHeatmaps(mapId: number | string) {
-    const { data } = await this.axios.get<MG.Api.HeatmapGroup[]>(
-      `/maps/${mapId}/heatmaps`
-    );
-    return data;
+    try {
+      const { data } = await this.axios.get<MG.Api.HeatmapGroup[]>(
+        `/maps/${mapId}/heatmaps`
+      );
+      return data;
+    } catch (error) {
+      if (!this.isUnavailable(error)) throw error;
+      logger.warn(`Heatmaps API is unavailable for map ${mapId}.`, error);
+      return [];
+    }
   }
 
   @Memoize()
   public async getDomainForGame(gameId: number | string): Promise<string> {
-    const game = await this.fetchGame(gameId);
+    const game = await this.fetchGameInfo(gameId);
     return game.domain;
   }
 
   @Memoize()
-  public async fetchGameBySlug(slug: string): Promise<MG.Api.GameFull> {
+  public async fetchGameBySlug(slug: string): Promise<MG.Api.Game> {
     const games = await this.fetchGames();
     const game = games.find((g) => g.slug === slug);
     if (!game) {
       throw new Error(`Game with slug "${slug}" not found`);
     }
-    return this.fetchGame(game.id);
+    return game;
   }
 
   @Memoize()

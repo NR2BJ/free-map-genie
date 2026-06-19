@@ -8,10 +8,13 @@ import storageService from "@/services/storage.service";
  */
 
 export default defineContentScript({
-  matches: ["*://*/?fmgStorage"],
+  matches: ["<mapgenie_domains>"],
   runAt: "document_start",
   allFrames: true,
   main() {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("fmgStorage")) return;
+
     storageService.provide(window.location.host);
 
     // Stop further loading of this frame

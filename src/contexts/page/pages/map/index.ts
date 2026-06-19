@@ -13,33 +13,69 @@ export class MapPage extends Page {
   private client = new Client();
   private ui = new UI();
 
+  private async withTimeout<T>(
+    promise: Promise<T>,
+    timeout: number,
+    message: string
+  ) {
+    let handle: number | undefined;
+
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      handle = window.setTimeout(
+        () => reject(new Error(`${message} timed out after ${timeout}ms.`)),
+        timeout
+      );
+    });
+
+    try {
+      return await Promise.race([promise, timeoutPromise]);
+    } finally {
+      if (handle !== undefined) {
+        window.clearTimeout(handle);
+      }
+    }
+  }
+
   private async setupUser() {
-    if (!window.user) return;
+    const user = window.user;
+    if (!user) return;
 
-    // Get the active user from the backend
-    const activeUserId = await this.client.getActiveUserId();
-
-    // Update the user
-    window.user.realId = window.user.id;
-    window.user.id = activeUserId ?? window.user.id;
-    window.user!.hasPro = true;
+    user.realId = user.id;
+    window.isPro = true;
+    user.hasPro = true;
 
     window.mapData!.maxMarkedLocations = Infinity;
+
+    try {
+      const activeUserId = await this.withTimeout(
+        this.client.getActiveUserId(),
+        1000,
+        "Active FMG profile lookup"
+      );
+
+      user.id = activeUserId ?? user.id;
+    } catch (err) {
+      logger.warn("Could not load active FMG profile before map boot.", err);
+    }
   }
 
   private async loadUserData() {
     await this.client.migrate();
     const data = await this.client.getData();
 
+    const pageLocations = window.mapData!.locations ?? [];
     const locationsById = Object.fromEntries(
-      window.mapData!.locations.map((loc) => [loc.id, loc])
+      pageLocations.map((loc) => [loc.id, loc])
     );
 
-    const filteredLocations = Object.fromEntries(
-      Object.keys(data.locations)
-        .filter((id) => !!locationsById[id])
-        .map((id) => [id, true])
-    );
+    const filteredLocations =
+      pageLocations.length > 0
+        ? Object.fromEntries(
+            Object.keys(data.locations)
+              .filter((id) => !!locationsById[id])
+              .map((id) => [id, true])
+          )
+        : data.locations;
 
     const filteredNotes = data.notes.filter(
       (note) => note.map_id === window.mapData!.map.id
@@ -50,10 +86,94 @@ export class MapPage extends Page {
 
     window.mapData!.notes = filteredNotes;
     window.mapData!.presets = data.presets;
+
+    logger.log(
+      `Loaded ${Object.keys(filteredLocations).length} saved FMG locations.`
+    );
+  }
+
+  private getSavedLocationIdsForCurrentMap() {
+    const savedLocationIds = Object.keys(window.user?.locations ?? {})
+      .filter((id) => window.user!.locations[id])
+      .map(Number);
+
+    const stateLocationIds = Object.keys(
+      window.store?.getState().map.locationById ?? {}
+    ).map(Number);
+
+    if (stateLocationIds.length === 0) {
+      return savedLocationIds;
+    }
+
+    const stateLocationIdsSet = new Set(stateLocationIds);
+    return savedLocationIds.filter((id) => stateLocationIdsSet.has(id));
+  }
+
+  private syncSavedLocationsToMap() {
+    const store = window.store;
+    if (!store) return;
+
+    const locationIds = this.getSavedLocationIdsForCurrentMap();
+    if (locationIds.length === 0) return;
+
+    const state = store.getState();
+    const foundLocations = state.user.foundLocations ?? {};
+    const missingLocationIds = locationIds.filter(
+      (id) => !foundLocations[id]
+    );
+
+    if (missingLocationIds.length > 0) {
+      store.dispatch({
+        type: "MG:USER:MARK_LOCATIONS",
+        meta: {
+          locationIds: missingLocationIds,
+          found: true,
+        },
+      } as any);
+    }
+
+    window.mapManager?.updateFoundLocationsStyle();
+
+    logger.log(
+      `Synced ${locationIds.length} saved FMG locations to the map` +
+        ` (${missingLocationIds.length} newly marked).`
+    );
+  }
+
+  private lockValue(obj: object, key: PropertyKey, value: unknown) {
+    Object.defineProperty(obj, key, {
+      configurable: true,
+      enumerable: true,
+      get: () => value,
+      set: () => {},
+    });
+  }
+
+  private lockProData() {
+    if (window.user) {
+      this.lockValue(window, "isPro", true);
+      this.lockValue(window.user, "hasPro", true);
+      this.lockValue(window.user, "locations", window.user.locations);
+      this.lockValue(
+        window.user,
+        "trackedCategoryIds",
+        window.user.trackedCategoryIds
+      );
+    }
+
+    if (window.mapData) {
+      this.lockValue(window.mapData, "maxMarkedLocations", Infinity);
+      this.lockValue(window.mapData, "notes", window.mapData.notes);
+      this.lockValue(window.mapData, "presets", window.mapData.presets);
+    }
   }
 
   private async unlockMapLinks() {
-    await fixMapLinks(this.client.mapgenie);
+    try {
+      await fixMapLinks(this.client.mapgenie);
+    } catch (err) {
+      logger.error("Failed to unlock map links, loading map anyway.", err);
+    }
   }
 
   @LazyGetter()
@@ -63,26 +183,11 @@ export class MapPage extends Page {
     return mapIdParmam ? Number(mapIdParmam) : null;
   }
 
-  @LazyGetter()
-  private get hasProCategoryLocations() {
-    const proCategoryLocationCounts = window.mapData!.proCategoryLocationCounts;
-    for (const key in proCategoryLocationCounts) {
-      const count = proCategoryLocationCounts[key];
-      if (count > 0) return true;
-    }
-    return false;
-  }
-
   private async loadMapDataForMapId(mapId: number) {
-    const game = await this.client.mapgenie.fetchGame(window.game!.id);
-    const map = game.maps.find((m) => m.id === mapId);
-
-    if (!map) {
-      logger.warn(`Map with ID ${mapId} not found in game ${game.title}`);
-      return;
-    }
-
-    mapDataUtils.loadMapData(map);
+    const map = await this.client.mapgenie.fetchMap(mapId);
+    mapDataUtils.loadMapData(map, {
+      preserveMapConfig: mapId === window.mapData?.map.id,
+    });
   }
 
   private async loadMapData() {
@@ -90,16 +195,12 @@ export class MapPage extends Page {
 
     if (this.fmgMapId !== null) {
       await this.loadMapDataForMapId(this.fmgMapId);
-      return;
-    }
-
-    if (this.hasProCategoryLocations) {
-      await this.loadMapDataForMapId(window.mapData!.map.id);
     }
   }
 
   private async loadHeatmaps() {
     if (!window.mapData?.heatmapGroups) return;
+    if (this.fmgMapId === null) return;
 
     const hasHeatmaps = window.mapData.heatmapGroups.length > 0;
     if (!hasHeatmaps) return;
@@ -109,6 +210,16 @@ export class MapPage extends Page {
     );
 
     mapDataUtils.loadHeatmaps(heatmaps);
+  }
+
+  private async loadRemoteMapData() {
+    try {
+      // If MapGenie's data API blocks a request, still boot the page's own map.
+      await this.loadMapData();
+      await this.loadHeatmaps();
+    } catch (err) {
+      logger.error("Failed to load pro map data, loading map anyway.", err);
+    }
   }
 
   private setupEventListeners() {
@@ -158,14 +269,25 @@ export class MapPage extends Page {
     }
   }
 
+  private async activateMapScript() {
+    if (window.mapManager) return;
+
+    const activated = await activateBlockedMapgenieScript("map");
+    if (!activated) {
+      logger.warn("MapGenie map script not found.");
+      return;
+    }
+
+    await waitForProperty(window, "mapManager", 30000);
+  }
+
   public async start() {
     await waitForProperty(window, "mapData");
 
     await this.setupUser();
 
     // Load map data and heatmaps for pro maps and maps with heatmaps
-    await this.loadMapData();
-    await this.loadHeatmaps();
+    await this.loadRemoteMapData();
 
     // Overwrite some game config options
     if (window.config) {
@@ -179,7 +301,7 @@ export class MapPage extends Page {
     await this.unlockMapLinks();
 
     if (!window.user) {
-      await activateBlockedMapgenieScript("map");
+      await this.activateMapScript();
 
       // In development mode, auto-login and load map data to speed up testing
       if (import.meta.env.DEV) {
@@ -189,22 +311,43 @@ export class MapPage extends Page {
       return;
     }
 
-    // Request persistend storage
-    await this.client.storageRequestPersist();
+    try {
+      await this.withTimeout(
+        (async () => {
+          // Request persistend storage
+          await this.client.storageRequestPersist();
 
-    // Login client from map data
-    this.client.loginFromMap();
+          // Login client from map data
+          this.client.loginFromMap();
 
-    // Load user data
-    await this.loadUserData();
+          // Load user data
+          await this.loadUserData();
+        })(),
+        5000,
+        "FMG user data loading"
+      );
+    } catch (err) {
+      logger.error("Failed to load FMG user data, loading map anyway.", err);
+    }
 
     // Fix alt map sdk if needed
     this.fixAltMapSdk();
 
-    await activateBlockedMapgenieScript("map");
+    this.lockProData();
+
+    await this.activateMapScript();
+    this.syncSavedLocationsToMap();
 
     this.setupEventListeners();
-    await this.client.installInterceptor();
+    try {
+      await this.withTimeout(
+        this.client.installInterceptor(),
+        5000,
+        "FMG request interceptor installation"
+      );
+    } catch (err) {
+      logger.error("Failed to install FMG request interceptor.", err);
+    }
     await this.ui.mount();
 
     // Restore fmgMapId param on pro maps

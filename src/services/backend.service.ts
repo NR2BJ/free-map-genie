@@ -44,10 +44,9 @@ class BackendService {
     if (permission.state === "granted") {
       return navigator.storage.persist();
     } else {
-      console.warn(
-        "Persistent storage permission not granted:",
-        permission.state
-      );
+      logger.debug("Persistent storage permission not granted.", {
+        state: permission.state,
+      });
       return false;
     }
   }

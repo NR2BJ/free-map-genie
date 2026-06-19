@@ -29,10 +29,13 @@ const setupLogger = () => {
  */
 
 export default defineContentScript({
-  matches: ["https://mapgenie.io/*?fmgBackend"],
+  matches: ["https://mapgenie.io/*"],
   runAt: "document_start",
   allFrames: true,
   async main() {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("fmgBackend")) return;
+
     setupLogger();
 
     // Ensure the body is loaded before providing services

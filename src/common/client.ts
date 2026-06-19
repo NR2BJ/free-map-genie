@@ -137,16 +137,20 @@ export class Client {
 
     // Fallback to fetching from API if not available in mapData
     if (!presets) {
-      const game = await this.mapgenie.fetchGame(this.key.gameId);
-      presets = game.default_presets;
+      try {
+        const game = await this.mapgenie.fetchGame(this.key.gameId);
+        presets = game.default_presets;
+      } catch (error) {
+        logger.debug("Could not fetch default presets.", error);
+        presets = [];
+      }
     }
 
     //Invert IDs to avoid conflicts with local saved presets
-    presets.forEach((preset) => {
-      preset.id = -preset.id;
-    });
-
-    return presets;
+    return presets.map((preset) => ({
+      ...preset,
+      id: -Math.abs(preset.id),
+    }));
   }
 
   public async getActiveUserId() {

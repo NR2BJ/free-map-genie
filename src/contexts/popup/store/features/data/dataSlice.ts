@@ -9,26 +9,43 @@ const saveHelper = new SaveHelper();
 
 export interface DataState {
   busy: boolean;
-  loggedIn: boolean;
+  mapgenieLoggedIn: boolean;
+  hasActiveProfile: boolean;
   pageType: PageType;
 }
 
 const initialState: DataState = {
   busy: false,
-  loggedIn: false,
+  mapgenieLoggedIn: false,
+  hasActiveProfile: false,
   pageType: "unknown",
 };
 
-export const fetchLoggedInStatusAsync = createAppAsyncThunk<boolean, void>(
-  "data/fetchLoggedInStatus",
+export interface DataStatus {
+  mapgenieLoggedIn: boolean;
+  hasActiveProfile: boolean;
+}
+
+export const fetchDataStatusAsync = createAppAsyncThunk<DataStatus, void>(
+  "data/fetchDataStatus",
   async (_, { extra: { services } }) => {
+    let mapgenieLoggedIn = false;
+    let hasActiveProfile = false;
+
     try {
-      return services.backend.isLoggedIn();
+      mapgenieLoggedIn = await services.backend.isLoggedIn();
     } catch (e) {
-      toastr.error("Error", "Failed to fetch logged in status");
-      logger.error("Failed to fetch logged in status", e);
-      return false;
+      logger.debug("Failed to fetch MapGenie logged in status.", e);
     }
+
+    try {
+      hasActiveProfile = (await services.backend.getActiveProfile()) !== null;
+    } catch (e) {
+      toastr.error("Error", "Failed to fetch FMG profile status");
+      logger.error("Failed to fetch FMG profile status", e);
+    }
+
+    return { mapgenieLoggedIn, hasActiveProfile };
   }
 );
 
@@ -135,8 +152,9 @@ export const infoSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
-      .addCase(fetchLoggedInStatusAsync.fulfilled, (state, action) => {
-        state.loggedIn = action.payload;
+      .addCase(fetchDataStatusAsync.fulfilled, (state, action) => {
+        state.mapgenieLoggedIn = action.payload.mapgenieLoggedIn;
+        state.hasActiveProfile = action.payload.hasActiveProfile;
       })
       .addCase(fetchPageTypeAsync.fulfilled, (state, action) => {
         state.pageType = action.payload;
@@ -162,13 +180,19 @@ export const infoSlice = createSlice({
   },
   selectors: {
     isBusy: (state) => state.busy,
-    isLoggedIn: (state) => state.loggedIn,
+    isMapgenieLoggedIn: (state) => state.mapgenieLoggedIn,
+    hasActiveProfile: (state) => state.hasActiveProfile,
     getPageType: (state) => state.pageType,
   },
 });
 
 export const {} = infoSlice.actions;
 
-export const { isBusy, isLoggedIn, getPageType } = infoSlice.selectors;
+export const {
+  isBusy,
+  isMapgenieLoggedIn,
+  hasActiveProfile,
+  getPageType,
+} = infoSlice.selectors;
 
 export default infoSlice.reducer;

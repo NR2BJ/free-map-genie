@@ -12,7 +12,7 @@ export class OffscreenService {
     return $<HTMLIFrameElement>("<iframe/>")
       .attr({
         src: url,
-        sandbox: "allow-same-origin",
+        sandbox: "allow-same-origin allow-scripts",
       })
       .css({
         display: "none",

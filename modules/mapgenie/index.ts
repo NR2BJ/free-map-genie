@@ -1,7 +1,5 @@
 /// <reference types="../../src/types/mapgenie/api.d.ts" />
 
-import Cache from "file-system-cache";
-
 import path from "node:path";
 import fs from "node:fs";
 
@@ -12,20 +10,8 @@ import define from "./defines";
 
 import type { Wxt } from "wxt";
 
-const cache = Cache({
-  basePath: ".cache",
-  ns: "mapgenie",
-  ttl: 60 * 5, // 5 minutes
-});
-
 const fetchDomains = async (wxt: Wxt) => {
-  const cached: string[] | null = await cache.get("domains");
-  if (cached) {
-    wxt.logger.log("[MapGenie] Using cached domains");
-    return cached;
-  } else {
-    wxt.logger.log("[MapGenie] Fetching domains from MapGenie API");
-  }
+  wxt.logger.log("[MapGenie] Fetching domains from MapGenie API");
 
   const res = await fetch("https://mapgenie.io/api/v1/games");
   const data = await res.json();
@@ -36,8 +22,6 @@ const fetchDomains = async (wxt: Wxt) => {
       games.map((game) => new URL(game.config.url)).map((url) => url.host)
     )
   );
-
-  await cache.set("domains", domains);
 
   return domains;
 };

@@ -1,6 +1,6 @@
 import { useAppSelector, useAppDispatch } from "@/contexts/popup/hooks";
 import {
-  fetchLoggedInStatusAsync,
+  fetchDataStatusAsync,
   fetchPageTypeAsync,
   openDataManagerAsync,
   importFromMapgenieAccountAsync,
@@ -9,7 +9,8 @@ import {
   exportUserDataAsync,
   exportGameDataAsync,
   isBusy,
-  isLoggedIn,
+  isMapgenieLoggedIn,
+  hasActiveProfile,
   getPageType,
 } from "./dataSlice";
 import { DataAction } from "./DataAction";
@@ -19,20 +20,22 @@ import style from "./Data.module.scss";
 export const Data = ({}: Data.Props) => {
   const dispatch = useAppDispatch();
   const busy = useAppSelector(isBusy);
-  const loggedIn = useAppSelector(isLoggedIn);
+  const mapgenieLoggedIn = useAppSelector(isMapgenieLoggedIn);
+  const fmgProfileAvailable = useAppSelector(hasActiveProfile);
   const pageType = useAppSelector(getPageType);
 
   const isMap = pageType === "map";
   const isGuide = pageType === "guide";
+  const hasPageClient = fmgProfileAvailable && (isGuide || isMap);
 
-  const importFromAccountEnabled = loggedIn && (isGuide || isMap);
-  const exportUserEnabled = loggedIn;
-  const exportGameEnabled = loggedIn && (isGuide || isMap);
-  const clearMapEnabled = loggedIn && isMap;
-  const clearGameEnabled = loggedIn && (isGuide || isMap);
+  const importFromAccountEnabled = mapgenieLoggedIn && hasPageClient;
+  const exportUserEnabled = fmgProfileAvailable;
+  const exportGameEnabled = hasPageClient;
+  const clearMapEnabled = fmgProfileAvailable && isMap;
+  const clearGameEnabled = hasPageClient;
 
   React.useEffect(() => {
-    dispatch(fetchLoggedInStatusAsync());
+    dispatch(fetchDataStatusAsync());
     dispatch(fetchPageTypeAsync());
   }, []);
 
@@ -46,7 +49,7 @@ export const Data = ({}: Data.Props) => {
         <Button
           className={style.btn}
           onClick={onOpenDataManager}
-          disabled={!loggedIn}
+          disabled={!fmgProfileAvailable}
         >
           <FontIcon icon="open-new-tab" className={style.icon} />
           <span>Open data manager</span>

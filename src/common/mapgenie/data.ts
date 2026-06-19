@@ -26,11 +26,52 @@ const getCategories = (map: MG.Api.MapFull) => {
   );
 };
 
-export const loadMapData = (map: MG.Api.MapFullForGame) => {
+const normalizeTileSet = (
+  tileSet: Partial<MG.TileSet>,
+  originalTileSet?: MG.TileSet
+): MG.TileSet => {
+  const pattern =
+    tileSet.pattern ??
+    originalTileSet?.pattern ??
+    `${tileSet.path}/{z}/{y}/{x}.${tileSet.extension ?? "jpg"}`;
+
+  return {
+    ...originalTileSet,
+    ...tileSet,
+    pattern,
+  } as MG.TileSet;
+};
+
+const normalizeMapConfig = (
+  config: MG.Api.MapFull["config"],
+  originalConfig?: MG.MapConfig
+): MG.MapConfig => {
+  return {
+    ...config,
+    tile_sets: config.tile_sets.map((tileSet) => {
+      const originalTileSet = originalConfig?.tile_sets.find(
+        (original) =>
+          original.name === tileSet.name || original.path === tileSet.path
+      );
+
+      return normalizeTileSet(tileSet, originalTileSet);
+    }),
+  };
+};
+
+export interface LoadMapDataOptions {
+  preserveMapConfig?: boolean;
+}
+
+export const loadMapData = (
+  map: MG.Api.MapFull,
+  { preserveMapConfig = false }: LoadMapDataOptions = {}
+) => {
   if (!window.mapData) {
     throw new Error("mapData is not available on window");
   }
 
+  const originalMapConfig = window.mapData.mapConfig;
   const locations = getLocations(map);
   const categories = getCategories(map);
 
@@ -38,7 +79,9 @@ export const loadMapData = (map: MG.Api.MapFullForGame) => {
   window.mapData.groups = map.groups;
   window.mapData.locations = locations;
   window.mapData.categories = categories;
-  window.mapData.mapConfig = map.config;
+  window.mapData.mapConfig = preserveMapConfig
+    ? originalMapConfig
+    : normalizeMapConfig(map.config, originalMapConfig);
   window.mapData.regions = map.regions;
 
   window.initialZoom = map.config.initial_zoom;
