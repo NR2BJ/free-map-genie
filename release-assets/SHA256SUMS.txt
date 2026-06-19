@@ -1,2 +1,2 @@
-e5888cb7ce60ac3ec96a6fc277b95ed75337a3d38ee9f5e11c6cc60146b26b76  fmg-3.0.0-chrome.zip
-45f23230bbd5c5a6a17cdeecb0d1ff037e7fe91ec1bc7f7272513c152060ef77  fmg-3.0.0-firefox-unsigned.xpi
+080894d1bb49aeeb9801307ad1a432f44235d3324456af4028a34b2df17254e4  fmg-3.0.0-chrome.zip
+095bc43d68963835980fc4e5c1ce6ecdc71d64cccbbb0af8bf8e4c50e103201c  fmg-3.0.0-firefox-unsigned.xpi

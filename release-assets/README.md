@@ -17,4 +17,4 @@
 
 - Firefox direct installation outside temporary debugging normally requires Mozilla signing.
 - Chrome direct installation from GitHub is not the normal user path. Use Chrome Web Store for ordinary users, or provide the ZIP for developer-mode loading.
-- The Firefox manifest includes the stable add-on ID `viper-fmg@freemapgenie.com`, which is needed for stable storage and update behavior.
+- The Firefox manifest includes the stable add-on ID `free-map-genie-nr2bj@nr2bj.github.io`, which is unique to the NR2BJ fork for AMO signing.
