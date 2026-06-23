@@ -110,8 +110,8 @@ class BackendService {
     await this.database.locations.setFound(key, locationId, found);
   }
 
-  public async deleteLocations(locationIds: number[]) {
-    await this.database.locations.deleteIds(locationIds);
+  public async deleteLocations(key: Key, locationIds: number[]) {
+    await this.database.locations.deleteIds(key, locationIds);
   }
 
   public async trackCategory(key: Key, categoryId: number, track: boolean) {

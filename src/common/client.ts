@@ -168,7 +168,7 @@ export class Client {
 
   public async clearMap() {
     const locations = window.mapData!.locations.map((loc) => loc.id);
-    await this.backend.deleteLocations(locations);
+    await this.backend.deleteLocations(this.key, locations);
   }
 
   public async export() {

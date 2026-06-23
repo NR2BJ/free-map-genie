@@ -10,10 +10,10 @@ export interface LocationModelV1 {
 
 export class LocationsRepositoryV1 extends AbstractRepository<
   LocationModelV1,
-  [number, number]
+  [number, number, number]
 > {
-  public readonly tableName = "locations";
-  public readonly index = "[id+user_id], [game_id+user_id], user_id";
+  public readonly tableName = "locations_v2";
+  public readonly index = "[game_id+user_id+id], [game_id+user_id], user_id";
 
   public async setFound(key: Key, id: number, found: boolean) {
     if (found) {
@@ -23,7 +23,7 @@ export class LocationsRepositoryV1 extends AbstractRepository<
         id,
       });
     } else {
-      await this.table.where({ id, user_id: key.userId }).delete();
+      await this.table.delete([key.gameId, key.userId, id]);
     }
   }
 
@@ -47,8 +47,10 @@ export class LocationsRepositoryV1 extends AbstractRepository<
     });
   }
 
-  public async deleteIds(ids: number[]) {
-    await this.table.where("id").anyOf(ids).delete();
+  public async deleteIds(key: Key, ids: number[]) {
+    await this.table.bulkDelete(
+      ids.map((id) => [key.gameId, key.userId, id])
+    );
   }
 
   public async clear(key: Key) {
@@ -66,7 +68,7 @@ export class LocationsRepositoryV1 extends AbstractRepository<
 
   public async getChecklist(key: Key): Promise<Record<number, true>> {
     return this.table
-      .where({ user_id: key.userId })
+      .where({ game_id: key.gameId, user_id: key.userId })
       .toArray()
       .then((locations) => locations.map((location) => [location.id, true]))
       .then(Object.fromEntries);

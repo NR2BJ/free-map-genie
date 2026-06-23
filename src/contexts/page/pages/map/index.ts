@@ -101,12 +101,15 @@ export class MapPage extends Page {
       window.store?.getState().map.locationById ?? {}
     ).map(Number);
 
-    if (stateLocationIds.length === 0) {
-      return savedLocationIds;
-    }
+    const currentMapLocationIds =
+      stateLocationIds.length > 0
+        ? stateLocationIds
+        : (window.mapData?.locations ?? []).map((loc) => loc.id);
 
-    const stateLocationIdsSet = new Set(stateLocationIds);
-    return savedLocationIds.filter((id) => stateLocationIdsSet.has(id));
+    if (currentMapLocationIds.length === 0) return [];
+
+    const currentMapLocationIdsSet = new Set(currentMapLocationIds);
+    return savedLocationIds.filter((id) => currentMapLocationIdsSet.has(id));
   }
 
   private syncSavedLocationsToMap() {
