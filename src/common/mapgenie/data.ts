@@ -30,10 +30,12 @@ const normalizeTileSet = (
   tileSet: Partial<MG.TileSet>,
   originalTileSet?: MG.TileSet
 ): MG.TileSet => {
+  const path = tileSet.path ?? originalTileSet?.path;
+  const extension = tileSet.extension ?? originalTileSet?.extension ?? "jpg";
   const pattern =
     tileSet.pattern ??
-    originalTileSet?.pattern ??
-    `${tileSet.path}/{z}/{y}/{x}.${tileSet.extension ?? "jpg"}`;
+    (originalTileSet?.path === path ? originalTileSet?.pattern : undefined) ??
+    `${path}/{z}/{x}/{y}.${extension}`;
 
   return {
     ...originalTileSet,
@@ -50,8 +52,7 @@ const normalizeMapConfig = (
     ...config,
     tile_sets: config.tile_sets.map((tileSet) => {
       const originalTileSet = originalConfig?.tile_sets.find(
-        (original) =>
-          original.name === tileSet.name || original.path === tileSet.path
+        (original) => original.path === tileSet.path
       );
 
       return normalizeTileSet(tileSet, originalTileSet);
