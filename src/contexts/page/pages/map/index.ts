@@ -190,6 +190,10 @@ export class MapPage extends Page {
     const map = await this.client.mapgenie.fetchMap(mapId);
     mapDataUtils.loadMapData(map, {
       preserveMapConfig: mapId === window.mapData?.map.id,
+      swapTileCoordinates: mapDataUtils.getStoredTileCoordinateSwap(
+        map.game_id,
+        map.id
+      ),
     });
   }
 
