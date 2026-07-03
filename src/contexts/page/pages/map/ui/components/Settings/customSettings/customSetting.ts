@@ -79,17 +79,37 @@ export abstract class CustomSetting {
     return waitForProperty(window, "mapManager");
   }
 
-  protected async waitForMapLoaded() {
+  private async waitForMapObject(timeout = 5000) {
     await this.waitForMapManager();
 
-    if (window.mapManager!.map.loaded()) {
+    const deadline = Date.now() + timeout;
+    while (!window.mapManager?.map && Date.now() < deadline) {
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+    }
+
+    return window.mapManager?.map ?? null;
+  }
+
+  protected async waitForMapLoaded() {
+    const map = await this.waitForMapObject();
+
+    if (!map) {
+      logger.warn("MapGenie map object was not available before timeout.");
+      return;
+    }
+
+    if (typeof map.loaded === "function" && map.loaded()) {
+      return;
+    }
+
+    if (typeof map.on !== "function") {
       return;
     }
 
     return this.withTimeout(
       new Promise<void>((resolve) => {
-        window.mapManager!.map.on("load", () => resolve());
-        window.mapManager!.map.on("idle", () => resolve());
+        map.on("load", () => resolve());
+        map.on("idle", () => resolve());
       }),
       5000,
       "Waiting for MapGenie map load"

@@ -112,7 +112,61 @@ export class MapPage extends Page {
     return savedLocationIds.filter((id) => currentMapLocationIdsSet.has(id));
   }
 
-  private syncSavedLocationsToMap() {
+  private async waitForMapObject(timeout = 5000) {
+    await waitForProperty(window, "mapManager");
+
+    const deadline = Date.now() + timeout;
+    while (!window.mapManager?.map && Date.now() < deadline) {
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+    }
+
+    return window.mapManager?.map ?? null;
+  }
+
+  private async waitForMapStyle(timeout = 5000) {
+    const map = await this.waitForMapObject(timeout);
+    if (!map) return;
+
+    if (typeof map.loaded === "function" && map.loaded()) {
+      return;
+    }
+
+    if (typeof map.on !== "function") {
+      return;
+    }
+
+    await this.withTimeout(
+      new Promise<void>((resolve) => {
+        map.on("load", () => resolve());
+        map.on("idle", () => resolve());
+      }),
+      timeout,
+      "Waiting for MapGenie map style"
+    ).catch((err) => {
+      logger.warn("Map style event did not arrive before timeout.", err);
+    });
+  }
+
+  private async updateFoundLocationsStyle() {
+    try {
+      window.mapManager?.updateFoundLocationsStyle();
+      return;
+    } catch (err) {
+      logger.warn(
+        "Could not update found location style immediately; retrying after map load.",
+        err
+      );
+    }
+
+    try {
+      await this.waitForMapStyle();
+      window.mapManager?.updateFoundLocationsStyle();
+    } catch (err) {
+      logger.warn("Could not update found location style after retry.", err);
+    }
+  }
+
+  private async syncSavedLocationsToMap() {
     const store = window.store;
     if (!store) return;
 
@@ -135,7 +189,7 @@ export class MapPage extends Page {
       } as any);
     }
 
-    window.mapManager?.updateFoundLocationsStyle();
+    await this.updateFoundLocationsStyle();
 
     logger.log(
       `Synced ${locationIds.length} saved FMG locations to the map` +
@@ -288,6 +342,18 @@ export class MapPage extends Page {
     await waitForProperty(window, "mapManager", 30000);
   }
 
+  private async installRequestInterceptor() {
+    try {
+      await this.withTimeout(
+        this.client.installInterceptor(),
+        5000,
+        "FMG request interceptor installation"
+      );
+    } catch (err) {
+      logger.error("Failed to install FMG request interceptor.", err);
+    }
+  }
+
   public async start() {
     await waitForProperty(window, "mapData");
 
@@ -342,19 +408,12 @@ export class MapPage extends Page {
 
     this.lockProData();
 
+    await this.installRequestInterceptor();
+
     await this.activateMapScript();
-    this.syncSavedLocationsToMap();
+    await this.syncSavedLocationsToMap();
 
     this.setupEventListeners();
-    try {
-      await this.withTimeout(
-        this.client.installInterceptor(),
-        5000,
-        "FMG request interceptor installation"
-      );
-    } catch (err) {
-      logger.error("Failed to install FMG request interceptor.", err);
-    }
     await this.ui.mount();
 
     // Restore fmgMapId param on pro maps
