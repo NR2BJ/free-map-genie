@@ -49,7 +49,7 @@ export class MapPage extends Page {
     try {
       const activeUserId = await this.withTimeout(
         this.client.getActiveUserId(),
-        1000,
+        5000,
         "Active FMG profile lookup"
       );
 
@@ -346,7 +346,7 @@ export class MapPage extends Page {
     try {
       await this.withTimeout(
         this.client.installInterceptor(),
-        5000,
+        10000,
         "FMG request interceptor installation"
       );
     } catch (err) {
@@ -408,9 +408,8 @@ export class MapPage extends Page {
 
     this.lockProData();
 
-    await this.installRequestInterceptor();
-
     await this.activateMapScript();
+    await this.installRequestInterceptor();
     await this.syncSavedLocationsToMap();
 
     this.setupEventListeners();
