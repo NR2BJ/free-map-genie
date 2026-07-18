@@ -1,7 +1,7 @@
 import type mapgenieService from "@/services/mapgenie.service";
 
 type GameWithMaps = MG.Api.Game | MG.Api.GameFull;
-type MapInfo = MG.Api.Map | MG.Api.MapFullForGame;
+type MapInfo = MG.Api.Map | MG.Api.MapFullForGame | MG.Map;
 
 const getLinkMapName = ($link: JQuery<HTMLAnchorElement>) => {
   return $link
@@ -11,7 +11,10 @@ const getLinkMapName = ($link: JQuery<HTMLAnchorElement>) => {
     .trim();
 };
 
-const isUpgradeLink = (link: HTMLAnchorElement) => {
+const isLockedMapLink = (link: HTMLAnchorElement) => {
+  const href = link.getAttribute("href")?.trim();
+  if (!href || href === "#") return true;
+
   try {
     return new URL(link.href).pathname.endsWith("/upgrade");
   } catch {
@@ -21,7 +24,7 @@ const isUpgradeLink = (link: HTMLAnchorElement) => {
 
 const getProLinks = ($links: JQuery<HTMLAnchorElement>) => {
   return $links.filter(function () {
-    return isUpgradeLink(this);
+    return isLockedMapLink(this);
   });
 };
 
@@ -38,15 +41,15 @@ const getProHeaderLinks = (
   });
 };
 
-const createMapByTitle = (game: GameWithMaps) => {
-  return Object.fromEntries(game.maps.map((m) => [m.title.trim(), m]));
+const createMapByTitle = (maps: MapInfo[]) => {
+  return Object.fromEntries(maps.map((m) => [m.title.trim(), m]));
 };
 
 const getFreeLinkUrl = (
   $links: JQuery<HTMLAnchorElement>,
   game: GameWithMaps
 ) => {
-  const freeLink = $links.toArray().find((link) => !isUpgradeLink(link));
+  const freeLink = $links.toArray().find((link) => !isLockedMapLink(link));
   if (freeLink) {
     return new URL(freeLink.href);
   }
@@ -119,7 +122,10 @@ export const fixMapLinks = async (mapgenie: mapgenieService.Instance) => {
     return;
   }
 
-  const mapByTitle = createMapByTitle(game);
+  const mapByTitle = createMapByTitle([
+    ...game.maps,
+    ...(window.mapData?.maps ?? []),
+  ]);
 
   $proSidebarLinks.each((_, link) => fixLink(link, mapByTitle, freeMapUrl));
   $proHeaderLinks.each((_, link) => fixLink(link, mapByTitle, freeMapUrl));
@@ -142,7 +148,7 @@ export const fixGameHomeLinks = async (mapgenie: mapgenieService.Instance) => {
     return;
   }
 
-  const mapByTitle = createMapByTitle(game);
+  const mapByTitle = createMapByTitle(game.maps);
 
   $proMapLinks.each((_, link) => fixLink(link, mapByTitle, freeMapUrl));
 };

@@ -59,6 +59,37 @@ export class MapPage extends Page {
     }
   }
 
+  private getTrackedCategoryIdsForCurrentMap(categoryIds: number[]) {
+    const categories = window.mapData?.categories ?? {};
+    const availableCategoryIds = new Set(
+      Object.keys(categories).map((id) => Number(id))
+    );
+
+    const filteredCategoryIds = categoryIds.filter((id) =>
+      availableCategoryIds.has(id)
+    );
+
+    if (filteredCategoryIds.length !== categoryIds.length) {
+      const ignoredCategoryIds = categoryIds.filter(
+        (id) => !availableCategoryIds.has(id)
+      );
+      logger.warn(
+        "Ignoring tracked categories that are not available on the current map.",
+        ignoredCategoryIds
+      );
+    }
+
+    return filteredCategoryIds;
+  }
+
+  private filterTrackedCategoriesForCurrentMap() {
+    if (!window.user) return;
+
+    window.user.trackedCategoryIds = this.getTrackedCategoryIdsForCurrentMap(
+      window.user.trackedCategoryIds ?? []
+    );
+  }
+
   private async loadUserData() {
     await this.client.migrate();
     const data = await this.client.getData();
@@ -82,7 +113,9 @@ export class MapPage extends Page {
     );
 
     window.user!.locations = filteredLocations;
-    window.user!.trackedCategoryIds = data.trackedCategoryIds;
+    window.user!.trackedCategoryIds = this.getTrackedCategoryIdsForCurrentMap(
+      data.trackedCategoryIds
+    );
 
     window.mapData!.notes = filteredNotes;
     window.mapData!.presets = data.presets;
@@ -361,6 +394,10 @@ export class MapPage extends Page {
 
     // Load map data and heatmaps for pro maps and maps with heatmaps
     await this.loadRemoteMapData();
+
+    // MapGenie stores tracked categories per game. Only pass categories that
+    // exist on this map or its map script may fail during initialization.
+    this.filterTrackedCategoriesForCurrentMap();
 
     // Overwrite some game config options
     if (window.config) {

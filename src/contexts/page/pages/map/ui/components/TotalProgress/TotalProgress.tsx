@@ -10,7 +10,7 @@ export class TotalProgress extends IntegratedComponent<TotalProgress.Props> {
   public render() {
     const { total, found } = this.props;
 
-    const percent = total > 0 ? (found / total) * 100 : 100;
+    const percent = total > 0 ? Math.min((found / total) * 100, 100) : 100;
 
     return (
       <>
@@ -53,8 +53,15 @@ export class TotalProgress extends IntegratedComponent<TotalProgress.Props> {
   }
 
   public updateFromState(state: MG.State) {
-    const total = MapInfo.totalMarkerLocations;
-    const found = state.user.foundLocationsCount;
+    const currentMapMarkers = (window.mapData?.locations ?? []).filter(
+      (location) => MapInfo.isMarker(location)
+    );
+    const foundLocations = state.user.foundLocations ?? {};
+
+    const total = currentMapMarkers.length;
+    const found = currentMapMarkers.filter(
+      (location) => foundLocations[location.id]
+    ).length;
 
     this.update({ total, found });
   }
