@@ -130,8 +130,9 @@ export class MapPage extends Page {
       .filter((id) => window.user!.locations[id])
       .map(Number);
 
+    const mapState = window.store?.getState().map;
     const stateLocationIds = Object.keys(
-      window.store?.getState().map.locationById ?? {}
+      mapState?.locationsById ?? mapState?.locationById ?? {}
     ).map(Number);
 
     const currentMapLocationIds =
@@ -146,7 +147,7 @@ export class MapPage extends Page {
   }
 
   private async waitForMapObject(timeout = 5000) {
-    await waitForProperty(window, "mapManager");
+    await waitForProperty(window, "mapManager", timeout);
 
     const deadline = Date.now() + timeout;
     while (!window.mapManager?.map && Date.now() < deadline) {
@@ -156,9 +157,9 @@ export class MapPage extends Page {
     return window.mapManager?.map ?? null;
   }
 
-  private async waitForMapStyle(timeout = 5000) {
+  private async waitForMapStyle(timeout = 30000) {
     const map = await this.waitForMapObject(timeout);
-    if (!map) return;
+    if (!map) throw new Error("MapGenie map object is not ready.");
 
     if (typeof map.loaded === "function" && map.loaded()) {
       return;
@@ -168,16 +169,18 @@ export class MapPage extends Page {
       return;
     }
 
-    await this.withTimeout(
-      new Promise<void>((resolve) => {
-        map.on("load", () => resolve());
-        map.on("idle", () => resolve());
-      }),
-      timeout,
-      "Waiting for MapGenie map style"
-    ).catch((err) => {
-      logger.warn("Map style event did not arrive before timeout.", err);
+    let onReady: () => void = () => {};
+    const ready = new Promise<void>((resolve) => {
+      onReady = resolve;
+      map.on("load", onReady);
+      map.on("idle", onReady);
     });
+    try {
+      await this.withTimeout(ready, timeout, "Waiting for MapGenie map style");
+    } finally {
+      map.off("load", onReady);
+      map.off("idle", onReady);
+    }
   }
 
   private async updateFoundLocationsStyle() {
@@ -200,6 +203,13 @@ export class MapPage extends Page {
   }
 
   private async syncSavedLocationsToMap() {
+    try {
+      await this.waitForMapStyle();
+    } catch (err) {
+      logger.warn("Could not restore saved marker styles before map load.", err);
+      return;
+    }
+
     const store = window.store;
     if (!store) return;
 
@@ -222,7 +232,16 @@ export class MapPage extends Page {
       } as any);
     }
 
-    await this.updateFoundLocationsStyle();
+    // Redux counters and MapLibre feature states are separate. Reapply every
+    // saved marker visually, even when Redux already counted it during boot.
+    try {
+      for (const id of locationIds) {
+        window.mapManager!.setLocationFound(id, true);
+      }
+      await this.updateFoundLocationsStyle();
+    } catch (err) {
+      logger.warn("Could not restore saved marker styles.", err);
+    }
 
     logger.log(
       `Synced ${locationIds.length} saved FMG locations to the map` +

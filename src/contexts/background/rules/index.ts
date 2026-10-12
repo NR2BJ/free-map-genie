@@ -1,4 +1,5 @@
 import { ExtensionSettings } from "@/common/extension/settings";
+import { getBlockedScriptPattern } from "@/common/mapgenie/scriptUrl";
 
 import { RulesManager } from "./manager";
 import { DeclarativeNetRequestManager } from "./declarativeNetRequest";
@@ -62,7 +63,7 @@ export class Rules {
       action: { type: "block" },
       condition: {
         requestDomains: ["cdn.mapgenie.io"],
-        regexFilter: "^https://cdn\\.mapgenie\\.io/js/map\\.js\\?id=",
+        regexFilter: getBlockedScriptPattern("map"),
         resourceTypes: ["script"],
       },
     });
@@ -74,8 +75,7 @@ export class Rules {
       action: { type: "block" },
       condition: {
         requestDomains: ["cdn.mapgenie.io"],
-        regexFilter:
-          "^https://cdn\\.mapgenie\\.io/js/TarkovQuestToolWidget\\.js\\?id=",
+        regexFilter: getBlockedScriptPattern("TarkovQuestToolWidget"),
         resourceTypes: ["script"],
       },
     });

@@ -16,6 +16,7 @@ declare namespace MG {
     locations: Location[];
     locationsByCategory: Location[];
     locationById: RecordById<Location>;
+    locationsById?: RecordById<Location>;
     multiTagFilters: Record<unknown, unknown>;
     newLocation: Nullable<Location>;
     regionFilter: Nullable<unknown>;

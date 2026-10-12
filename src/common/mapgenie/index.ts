@@ -1,4 +1,9 @@
 import { waitForBody } from "@/common/dom";
+import {
+  getReadyScriptUrl,
+  isMapgenieScript,
+  type MapgenieScriptName,
+} from "./scriptUrl";
 
 export { default as MapgenieAdBlocker } from "./ads";
 
@@ -6,26 +11,18 @@ export * from "./page";
 export * from "./links";
 export * as mapDataUtils from "./data";
 
-const getReadyScriptUrl = (src: string) => {
-  const url = new URL(src, window.location.href);
-  if (!url.searchParams.has("ready")) {
-    url.search = url.search ? `?ready&${url.search.slice(1)}` : "?ready";
-  }
-  return url.toString();
-};
-
 /**
  * This function reloads a blocked mapgenie script.
  * The background script blocks certain mapgenie scripts from loading.
  * We simply append ready to the script URL and re-insert it into the DOM.
  * The background script will allow it to load this time.
  */
-export const activateBlockedMapgenieScript = async (name: string) => {
+export const activateBlockedMapgenieScript = async (name: MapgenieScriptName) => {
   await waitForBody();
 
-  const ogScript = document.querySelector<HTMLScriptElement>(
-    `script[src^="https://cdn.mapgenie.io/js/${name}.js?id="]`
-  );
+  const ogScript = Array.from(
+    document.querySelectorAll<HTMLScriptElement>("script[src]")
+  ).find((script) => isMapgenieScript(script.src, name));
 
   if (!ogScript) {
     return false;
