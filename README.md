@@ -50,6 +50,16 @@ FMG save data is stored in the MapGenie page's IndexedDB database named `fmg:dat
 
 Temporary add-on reloads should not erase this data. Clearing site data, using a different Firefox profile/container, or deleting the browser profile can remove or hide it.
 
+## Local Notes Setting
+
+Enable **Show Notes on Load** in the map's SETTINGS section to show notes
+automatically after loading a map. The option is off by default and saved
+locally per game. Enabling it also shows notes immediately. You can still
+hide notes manually during the session; disabling the option only stops
+automatic showing on future loads and does not hide the current notes.
+
+This setting does not change note contents or add cloud synchronization.
+
 ## Build
 
 This project uses WXT.
