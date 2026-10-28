@@ -8,8 +8,15 @@ import mapgenieService from "./mapgenie.service";
 
 import type { Key, UserData } from "@/common/storage";
 import type { Bookmark } from "@/common/bookmark";
+import type { PageAccount } from "@/common/mapgenie/account";
+import { RecoveryStore, type RecoveryReason } from "@/common/storage/recovery";
+import { WriteStatus } from "@/common/storage/writeStatus";
+import { UserDataSchema } from "@/common/storage/format";
 
 class BackendService {
+  private accountLoggedIn?: boolean;
+  private readonly writes = new WriteStatus();
+  private readonly recovery = new RecoveryStore();
   private readonly migrator = new Migrator();
   private readonly database = new DexieDatabase();
 
@@ -23,9 +30,10 @@ class BackendService {
     setAuthToken(token);
   }
 
-  public isLoggedIn() {
-    const authToken = this.getAuthToken();
-    return !!authToken;
+  public async isLoggedIn() {
+    if (this.accountLoggedIn !== undefined) return this.accountLoggedIn;
+    if (this.getAuthToken()) return true;
+    return (await this.database.profiles.getUser()) !== null;
   }
 
   public storageEstimate() {
@@ -55,24 +63,57 @@ class BackendService {
     await this.migrator.migrate(domain, key);
   }
 
-  public async updateUser() {
-    if (!this.isLoggedIn()) {
-      await this.database.profiles.deleteUser();
+  public async updateUser(pageUser?: PageAccount | null) {
+    if (pageUser !== undefined) {
+      if (pageUser) {
+        if (!Number.isSafeInteger(pageUser.id) || pageUser.id < 0) {
+          throw new Error("Invalid MapGenie account ID");
+        }
+        const existing = await this.database.profiles.getUser();
+        const name = pageUser.name?.trim() ||
+          (existing?.id === pageUser.id ? existing.name : "MapGenie account");
+        await this.database.profiles.replaceUser(pageUser.id, name);
+      }
+      this.accountLoggedIn = pageUser !== null;
+      // Missing credentials or logout must not remove local save profiles.
+      return;
+    }
+    if (!this.getAuthToken()) {
       return;
     }
 
     const userData = await this.mapgenie.fetchUser(1);
 
     await this.database.profiles.replaceUser(userData.id, userData.username);
+    this.accountLoggedIn = true;
   }
 
   public async importFromMapgenieAccount(key: Key) {
-    if (!this.isLoggedIn()) {
+    if (!(await this.isLoggedIn())) {
       throw new Error("User is not logged in");
     }
 
     const user = await this.mapgenie.fetchUser(key.gameId);
-    await this.database.importMapgenie(key, user);
+    await this.writes.run("account-import", async () => {
+      await this.backup(key.userId, [key.gameId], "account-import");
+      await this.database.importMapgenie(key, user);
+    });
+  }
+
+  public async importAccountData(key: Key, data: UserData) {
+    const validated = UserDataSchema.parse(data);
+    await this.writes.run("account-import", async () => {
+      await this.backup(key.userId, [key.gameId], "account-import");
+      await this.database.setData(key, validated);
+    });
+  }
+
+  public async updateAccountName(id: number, name: string) {
+    const existing = await this.database.profiles.getUser();
+    // A slow name lookup from another tab must not switch the current account.
+    if (existing?.id === id && name.trim()) {
+      await this.database.profiles.replaceUser(id, name.trim());
+    }
   }
 
   public async import(games: Record<number, UserData>) {
@@ -81,7 +122,38 @@ class BackendService {
       throw new Error("No active user profile found");
     }
 
-    return this.database.import(user.id, games);
+    const validated = Object.fromEntries(Object.entries(games).map(([id, data]) => {
+      if (!/^\d+$/.test(id)) throw new Error("Invalid game ID");
+      return [id, UserDataSchema.parse(data)];
+    }));
+    if (!Object.keys(validated).length) throw new Error("No games selected");
+    return this.writes.run("import", async () => {
+      await this.backup(user.id, Object.keys(validated).map(Number), "import");
+      await this.database.import(user.id, validated);
+    });
+  }
+
+  private async backup(userId: number, gameIds: number[], reason: RecoveryReason, keepId?: string) {
+    const games = await this.database.snapshot(userId, gameIds);
+    await this.recovery.create(userId, games, reason, keepId);
+  }
+
+  public getSaveStatus() { return this.writes.get(); }
+
+  public async getRecoveryPoints() {
+    const user = await this.database.profiles.getActive();
+    if (!user) throw new Error("No active user profile found");
+    return this.recovery.list(user.id);
+  }
+
+  public async restoreRecoveryPoint(id: string) {
+    const user = await this.database.profiles.getActive();
+    if (!user) throw new Error("No active user profile found");
+    return this.writes.run("restore", async () => {
+      const games = await this.recovery.get(id, user.id);
+      await this.backup(user.id, Object.keys(games).map(Number), "restore", id);
+      await this.database.import(user.id, games);
+    });
   }
 
   public async export(userId: number, gameId?: number) {
@@ -103,34 +175,40 @@ class BackendService {
   }
 
   public async removeData(key: Key) {
-    await this.database.removeData(key);
+    await this.writes.run("clear-game", async () => {
+      await this.backup(key.userId, [key.gameId], "clear-game");
+      await this.database.removeData(key);
+    });
   }
 
   public async markLocationFound(key: Key, locationId: number, found: boolean) {
-    await this.database.locations.setFound(key, locationId, found);
+    await this.writes.run("marker", () => this.database.locations.setFound(key, locationId, found));
   }
 
   public async deleteLocations(key: Key, locationIds: number[]) {
-    await this.database.locations.deleteIds(key, locationIds);
+    await this.writes.run("clear-map", async () => {
+      await this.backup(key.userId, [key.gameId], "clear-map");
+      await this.database.locations.deleteIds(key, locationIds);
+    });
   }
 
   public async trackCategory(key: Key, categoryId: number, track: boolean) {
-    await this.database.categories.setTracked(key, categoryId, track);
+    await this.writes.run("category", () => this.database.categories.setTracked(key, categoryId, track));
   }
 
   public async addNote(key: Key, note: Omit<MG.Note, "id" | "created_at">) {
     const created_at = new Date().toISOString();
-    const id = await this.database.notes.add(key, { ...note, created_at });
+    const id = await this.writes.run("note", () => this.database.notes.add(key, { ...note, created_at }));
     const user_id = key.userId;
     return { ...note, user_id, created_at, id };
   }
 
   public async updateNote(id: string, updates: Partial<MG.Note>) {
-    return this.database.notes.update(id, updates);
+    return this.writes.run("note", () => this.database.notes.update(id, updates));
   }
 
   public async deleteNote(noteId: string) {
-    return this.database.notes.delete(noteId);
+    return this.writes.run("note", () => this.database.notes.delete(noteId));
   }
 
   public async addPreset(
@@ -138,7 +216,7 @@ class BackendService {
     preset: Omit<MG.Preset, "id" | "order">,
     ordering: number[]
   ) {
-    return this.database.transaction(
+    return this.writes.run("preset", () => this.database.transaction(
       "rw",
       this.database.presets.table,
       this.database.presetsOrdering.table,
@@ -146,20 +224,23 @@ class BackendService {
         const order = ordering.length;
         const id = await this.database.presets.add(key, preset);
 
-        await this.reorderPresets(key, [...ordering, id]);
+        await this.database.presetsOrdering.set(key, [...ordering, id]);
 
         return { ...preset, order, id };
       }
-    );
+    ));
   }
 
   public async deletePreset(presetId: number) {
-    await this.database.presets.delete(presetId);
-    await this.database.presetsOrdering.delete(presetId);
+    await this.writes.run("preset", () => this.database.transaction("rw",
+      this.database.presets.table, this.database.presetsOrdering.table, async () => {
+        await this.database.presets.delete(presetId);
+        await this.database.presetsOrdering.delete(presetId);
+      }));
   }
 
   public async reorderPresets(key: Key, ordering: number[]) {
-    await this.database.presetsOrdering.set(key, ordering);
+    await this.writes.run("preset", () => this.database.presetsOrdering.set(key, ordering));
   }
 
   public async getBookmarks() {
@@ -168,7 +249,9 @@ class BackendService {
 
   public async addBookmark(bookmark: Omit<Bookmark, "createdAt">) {
     const createdAt = new Date().toISOString();
-    await this.database.bookmarks.add({ ...bookmark, createdAt });
+    const saved = { ...bookmark, createdAt };
+    await this.database.bookmarks.add(saved);
+    return saved;
   }
 
   public async deleteBookmark(url: string) {

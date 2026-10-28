@@ -32,19 +32,19 @@
 .tab-views {
   display: grid;
   overflow-y: auto;
+  min-height: 325px;
   max-height: 100%;
   margin: 0.5rem;
 }
 
 .tab-view-container {
-  opacity: 0;
-  pointer-events: none;
+  display: none;
+  min-width: 0;
 
   grid-column: 1;
   grid-row: 1;
 
   &.active {
-    opacity: 1;
-    pointer-events: all;
+    display: block;
   }
 }

@@ -1,0 +1,13 @@
+.recovery {
+  padding: 16px;
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  header > button { width: 36px; height: 36px; padding: 0; flex: 0 0 36px; }
+  h2 { font-size: 1.1rem; margin: 0; }
+  .notice { color: var(--color-light); font-size: 0.85rem; }
+  ul { list-style: none; padding: 0; margin: 12px 0; }
+  li { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  li > div { display: grid; gap: 4px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  time, small { color: var(--color-light); font-size: 0.8rem; }
+  li > button { width: auto; flex: 0 0 auto; min-width: 100px; display: inline-flex; gap: 6px; align-items: center; justify-content: center; }
+  @media (max-width: 480px) { li { align-items: flex-start; flex-direction: column; } }
+}

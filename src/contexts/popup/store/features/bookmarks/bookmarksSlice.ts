@@ -10,12 +10,14 @@ export interface BookmarksState {
   list: BookmarkInfo[];
   title: Record<string, number>;
   loading: boolean;
+  adding: boolean;
 }
 
 const initialState: BookmarksState = {
   list: [],
   title: {},
   loading: true,
+  adding: false,
 };
 
 export const addBookmarkAsync = createAppAsyncThunk<BookmarkInfo, void>(
@@ -23,9 +25,7 @@ export const addBookmarkAsync = createAppAsyncThunk<BookmarkInfo, void>(
   async (_, { extra: { services } }) => {
     try {
       const bookmark = await services.page.createBookmark();
-      await services.backend.addBookmark(bookmark);
-
-      return bookmark;
+      return await services.backend.addBookmark(bookmark);
     } catch (e) {
       toastr.error("Error", "Failed to add bookmark");
       logger.error("Failed to add bookmark", e);
@@ -78,8 +78,17 @@ export const bookmarksSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      .addCase(addBookmarkAsync.pending, (state) => {
+        state.adding = true;
+      })
+      .addCase(addBookmarkAsync.rejected, (state) => {
+        state.adding = false;
+      })
       .addCase(addBookmarkAsync.fulfilled, (state, action) => {
-        state.list.push(action.payload);
+        state.adding = false;
+        const index = state.list.findIndex((bookmark) => bookmark.url === action.payload.url);
+        if (index === -1) state.list.push(action.payload);
+        else state.list[index] = action.payload;
       })
       .addCase(removeBookmarkAsync.fulfilled, (state, action) => {
         state.list = state.list.filter(
@@ -98,12 +107,13 @@ export const bookmarksSlice = createSlice({
     selectBookmarks: (state) => state.list,
     selectBookmarkTitle: (state) => Object.keys(state.title)[0] || "",
     selectBookmarksLoading: (state) => state.loading,
+    selectBookmarkAdding: (state) => state.adding,
   },
 });
 
 export const { removeBookmarkTitle, setBookmarkTitle } = bookmarksSlice.actions;
 
-export const { selectBookmarks, selectBookmarkTitle, selectBookmarksLoading } =
+export const { selectBookmarks, selectBookmarkTitle, selectBookmarksLoading, selectBookmarkAdding } =
   bookmarksSlice.selectors;
 
 export default bookmarksSlice.reducer;

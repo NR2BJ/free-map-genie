@@ -5,6 +5,7 @@ import { Entry } from "./Entry";
 
 import style from "./Info.module.scss";
 import { Loading } from "@/components/Loading";
+import { Diagnostics } from "./Diagnostics";
 
 export const Info = ({}: Info.Props) => {
   const dispatch = useAppDispatch();
@@ -16,6 +17,7 @@ export const Info = ({}: Info.Props) => {
   }, []);
 
   return (
+    <Diagnostics>
     <Loading loading={loading} spinnerSize={"2rem"}>
       <div className={style.info}>
         {Object.entries(info).map(([key, value]) => (
@@ -23,6 +25,7 @@ export const Info = ({}: Info.Props) => {
         ))}
       </div>
     </Loading>
+    </Diagnostics>
   );
 };
 

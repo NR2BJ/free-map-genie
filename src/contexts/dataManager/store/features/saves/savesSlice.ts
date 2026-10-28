@@ -19,6 +19,7 @@ export interface SavesState {
   errors: Record<string, string[]>;
   loading: boolean;
   busy: boolean;
+  needsReload: boolean;
 }
 
 const initialState: SavesState = {
@@ -28,6 +29,7 @@ const initialState: SavesState = {
   errors: {},
   loading: false,
   busy: false,
+  needsReload: false,
 };
 
 export const readSaves = createAppAsyncThunk(
@@ -54,7 +56,7 @@ export const readSaves = createAppAsyncThunk(
 
 export const importSelectedSave = createAppAsyncThunk(
   "saves/import",
-  async (_, { getState, extra: { services } }) => {
+  async (_, { getState, extra: { services }, rejectWithValue }) => {
     try {
       const state = getState();
       const save = selectCurrentSave(state);
@@ -68,6 +70,7 @@ export const importSelectedSave = createAppAsyncThunk(
     } catch (error) {
       toastr.error("Error", "Failed to import selected save.");
       logger.error("Failed to import selected save", error);
+      return rejectWithValue("Import failed");
     }
   }
 );
@@ -76,6 +79,9 @@ export const savesSlice = createSlice({
   name: "saves",
   initialState,
   reducers: {
+    setNeedsReload: (state, action: PayloadAction<boolean>) => {
+      state.needsReload = action.payload;
+    },
     setSelected: (state, action: PayloadAction<number | null>) => {
       state.selected = action.payload;
       state.selectedGames = {};
@@ -138,12 +144,17 @@ export const savesSlice = createSlice({
       })
       .addCase(importSelectedSave.fulfilled, (state) => {
         state.busy = false;
+        state.needsReload = true;
+      })
+      .addCase(importSelectedSave.rejected, (state) => {
+        state.busy = false;
       });
   },
   selectors: {
     selectSaves: (state) => state.list,
     selectIsLoading: (state) => state.loading,
     selectIsBusy: (state) => state.busy,
+    selectNeedsReload: (state) => state.needsReload,
     selectSelected: (state) => state.selected,
     selectIsSelected: (state, index: number) => state.selected === index,
     selectIsGameSelected: (state, gameId: Id) => !!state.selectedGames[gameId],
@@ -159,12 +170,13 @@ export const savesSlice = createSlice({
   },
 });
 
-export const { setSelected, removeSave, setGameSelected } = savesSlice.actions;
+export const { setSelected, removeSave, setGameSelected, setNeedsReload } = savesSlice.actions;
 
 export const {
   selectSaves,
   selectIsLoading,
   selectIsBusy,
+  selectNeedsReload,
   selectSelected,
   selectIsSelected,
   selectIsGameSelected,

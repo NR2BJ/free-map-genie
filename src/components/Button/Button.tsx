@@ -5,6 +5,8 @@ export const Button = ({
   className,
   ref,
   disabled,
+  title,
+  ariaLabel,
   onClick,
   type = "normal",
   children,
@@ -15,6 +17,8 @@ export const Button = ({
       id={id}
       ref={ref}
       disabled={disabled}
+      title={title}
+      aria-label={ariaLabel}
       onClick={onClick}
       data-type={type}
     >
@@ -29,6 +33,8 @@ export namespace Button {
     id?: string;
     className?: string;
     disabled?: boolean;
+    title?: string;
+    ariaLabel?: string;
     value?: string;
     onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
     type?: "normal" | "cancel" | "confirm";

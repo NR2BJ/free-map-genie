@@ -33,7 +33,10 @@ export const fetchGamesAsync = createAppAsyncThunk(
     try {
       return await services.mapgenie.fetchGames();
     } catch (error) {
-      toastr.error("Error", "Failed to fetch games from MapGenie.");
+      toastr.warning(
+        "Game names unavailable",
+        "Could not load the game list. JSON import still works; games are shown by ID."
+      );
       logger.error("Failed to fetch games", error);
       return [];
     }

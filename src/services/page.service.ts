@@ -1,5 +1,6 @@
 import { createService, type ProxyInstance } from "@/common/messaging";
 import { getPageType } from "@/common/mapgenie";
+import { diagnosticMapUrl } from "@/common/diagnostics";
 
 import type { Bookmark, ImageUrl } from "@/common/bookmark";
 import type { Page } from "@/contexts/page/pages/page";
@@ -17,8 +18,8 @@ const validateBookmark: (
   bookmark
 ) => {
   const missing = Object.entries(bookmark)
-    .map(([name, element]) => (element ? name : null))
-    .filter((name) => name === null)
+    .filter(([name, element]) => name !== "icon" && !element)
+    .map(([name]) => name)
     .join(", ");
 
   if (missing) {
@@ -51,20 +52,22 @@ const getPageInfoFromHead = (): PartialBookmark => {
   );
 
   return {
-    url: urlMeta?.content || null,
-    title: titleMeta?.content || null,
+    url: urlMeta?.content || window.location.href,
+    title: titleMeta?.content || document.title || null,
     preview: imageMeta?.content || null,
-    icon: iconLink?.href || null,
+    icon: iconLink?.href || undefined,
   };
 };
 
 const getPreviewForMap = (preview: ImageUrl | null): ImageUrl | null => {
-  if (window.mapData?.maps.length! <= 1) {
+  // Current map pages no longer include the full game's map list.
+  if ((window.mapData?.maps?.length ?? 0) <= 1) {
     return preview;
   }
 
   const map = window.mapData!.map;
-  const game = window.game!;
+  const game = window.game;
+  if (!game || !map) return preview;
   const url = `https://cdn.mapgenie.io/images/games/${game.slug}/maps/${map.slug}.jpg`;
 
   const fallback = typeof preview === "string" ? preview : preview?.fallback;
@@ -101,25 +104,28 @@ export class PageService {
     // Fetch map data if mapId is available
     if (mapId) {
       // Validate map ID matches
-      const map = window.mapData!.map;
+      const map = window.mapData?.map;
+      if (!map) throw new Error("Map data is not ready for bookmarking");
       if (mapId != map.id) {
         throw new Error("Map ID mismatch");
       }
 
-      const game = window.game!;
+      const game = window.game;
 
       preview = getPreviewForMap(preview);
 
-      if (game.title !== map.title) {
+      if (game && game.title !== map.title) {
         title = game.title + " | " + map.title;
       } else {
-        title = game.title;
+        title = game?.title || map.title;
       }
     }
 
     // Append fmgMapId to URL if present
     if (fmgMapId) {
-      url = `${url}?fmgMapId=${fmgMapId}`;
+      const bookmarkUrl = new URL(url!, window.location.href);
+      bookmarkUrl.searchParams.set("fmgMapId", fmgMapId);
+      url = bookmarkUrl.href;
     }
 
     const bookmark = { url, preview, title, icon };
@@ -130,7 +136,7 @@ export class PageService {
     return {
       ...bookmark,
       pageType: pageType,
-      createdAt: Date.now(),
+      createdAt: new Date().toISOString(),
     };
   }
 
@@ -151,6 +157,21 @@ export class PageService {
 
   public async ping() {
     return "pong";
+  }
+
+  public getDiagnostics() {
+    return {
+      mapUrl: diagnosticMapUrl(window.location.href),
+      mapId: window.mapData?.map.id ?? null,
+      gameId: window.game?.id ?? null,
+      state: this.failed ? "failed" : "running",
+    };
+  }
+
+  public reloadMap() {
+    if (!window.mapData?.map) throw new Error("No map is connected");
+    // Respond to the caller before the page's messaging context disappears.
+    setTimeout(() => window.location.reload(), 150);
   }
 
   public async getPageType() {

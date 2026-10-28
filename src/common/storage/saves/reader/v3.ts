@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { AbstractSaveReader, type JsonFile } from "./abstract";
-import { UserDataSchema } from "../../format";
+import { UserDataSchema, Note } from "../../format";
 
 import type { UserData } from "../../format";
 
 const ExportedUserDataSchema = UserDataSchema.extend({
   locations: z.array(z.number()),
+  notes: z.array(Note.extend({ description: z.string().default("") })),
 });
 
 export type ExportedUserData = z.infer<typeof ExportedUserDataSchema>;

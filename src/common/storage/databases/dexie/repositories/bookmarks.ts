@@ -20,7 +20,7 @@ export class BookmarksRepositoryV1 extends AbstractRepository<
   public readonly index = "url, createdAt";
 
   public async add(bookmark: BookmarkModelV1) {
-    return this.table.add(bookmark);
+    return this.table.put(bookmark);
   }
 
   public async delete(url: string) {

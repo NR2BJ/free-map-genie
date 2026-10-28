@@ -4,11 +4,69 @@
   gap: 5px;
 }
 
+.diagnostics {
+  display: flex;
+  flex-direction: column;
+  height: 325px;
+  min-width: 0;
+  gap: 6px;
+  font-size: 0.8rem;
+}
+
+.diagnostic-toolbar {
+  display: flex;
+  flex: none;
+  gap: 6px;
+  button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--item);
+    color: var(--color);
+    cursor: pointer;
+    &:hover:not(:disabled) { background: var(--item-hover); }
+    &:disabled { opacity: 0.5; cursor: default; }
+  }
+  .diagnostic-toggle { width: auto; margin-right: auto; padding: 0 8px; }
+}
+
+.info-content, .diagnostic-report {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.info-content { overflow: auto; }
+
+.diagnostic-report {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  textarea {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    resize: none;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--item);
+    color: var(--color);
+  }
+  [role="status"] { overflow-wrap: anywhere; }
+}
+
 .entry {
   font-size: 0.8rem;
 
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   background-color: var(--item);
   border-radius: 6px;
 
@@ -19,5 +77,6 @@
   strong,
   span {
     padding: 5px;
+    overflow-wrap: anywhere;
   }
 }

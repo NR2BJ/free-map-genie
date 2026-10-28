@@ -1,19 +1,22 @@
-import { useAppDispatch } from "@/contexts/popup/hooks";
-import { addBookmarkAsync } from "./bookmarksSlice";
+import { useAppDispatch, useAppSelector } from "@/contexts/popup/hooks";
+import { addBookmarkAsync, selectBookmarkAdding } from "./bookmarksSlice";
 
 import style from "./Bookmarks.module.scss";
 
 export const BookmarkAddButton = ({}: BookmarkAddButton.Props) => {
   const dispatch = useAppDispatch();
+  const adding = useAppSelector(selectBookmarkAdding);
 
   const onClick = () => {
     dispatch(addBookmarkAsync());
   };
 
   return (
-    <div className={style.bookmarkContainer} onClick={onClick}>
-      <div className={style.bookmarkAddIcon}>+</div>
-    </div>
+    <button type="button" className={style.bookmarkContainer} onClick={onClick}
+      disabled={adding} title={adding ? "Adding bookmark..." : "Bookmark current page"}
+      aria-label="Bookmark current page">
+      <span className={style.bookmarkAddIcon}><FontIcon icon="plus" /></span>
+    </button>
   );
 };
 

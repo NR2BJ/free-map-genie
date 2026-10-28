@@ -14,3 +14,12 @@
     cursor: pointer;
   }
 }
+
+.save-status {
+  display: block;
+  text-align: center;
+  font-size: 0.7rem;
+  min-height: 1rem;
+  overflow-wrap: anywhere;
+  &[data-failed="true"] { color: var(--red); }
+}

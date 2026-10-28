@@ -78,6 +78,17 @@ export class DexieDatabase implements Database {
     };
   }
 
+  public async snapshot(userId: number, gameIds: number[]) {
+    return this.dexie.transaction("r", [this.locations.table, this.categories.table,
+      this.presets.table, this.presetsOrdering.table, this.notes.table], async () => {
+      const games: Record<number, UserData> = {};
+      for (const gameId of new Set(gameIds)) {
+        games[gameId] = await this.getData({ userId, gameId });
+      }
+      return games;
+    });
+  }
+
   public async setData(key: Key, data: UserData) {
     await this.dexie.transaction(
       "rw",

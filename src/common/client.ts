@@ -1,6 +1,7 @@
 import { Key } from "@/common/storage";
 import { AxiosInterceptor } from "@/common/axios";
 import { waitForProperty } from "@/common/object";
+import { fetchAccountData } from "@/common/mapgenie/accountImport";
 
 import backendService from "@/services/backend.service";
 import mapgenieService from "@/services/mapgenie.service";
@@ -159,7 +160,12 @@ export class Client {
   }
 
   public async importFromMapgenieAccount() {
-    await this.backend.importFromMapgenieAccount(this.key);
+    const key = this.key;
+    const game = await this.mapgenie.fetchGame(key.gameId);
+    const axios = await waitForProperty(window, "axios");
+    if (!axios) throw new Error("MapGenie session is not ready");
+    const data = await fetchAccountData(axios, game.maps.map((map) => map.id));
+    await this.backend.importAccountData(key, data);
   }
 
   public async clearGame() {

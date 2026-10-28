@@ -1,5 +1,7 @@
 import axios from "axios";
 import { setupCache } from "axios-cache-interceptor";
+import { browser } from "wxt/browser";
+import { fetchGameCatalog } from "@/common/mapgenie/gameCatalog";
 
 import { createService, Memoize, type ProxiedObject } from "@/common/messaging";
 
@@ -41,10 +43,11 @@ class MapgenieService {
     return data;
   }
 
-  @Memoize()
   public async fetchGames() {
-    const { data } = await this.axios.get<MG.Api.Game[]>("/games");
-    return data;
+    const baseURL = import.meta.env.DEV
+      ? import.meta.env.MAPGENIE_API_URL
+      : "https://mapgenie.io/api/v1";
+    return fetchGameCatalog(`${baseURL}/games`, browser.storage.local);
   }
 
   @Memoize()

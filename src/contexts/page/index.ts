@@ -10,6 +10,7 @@ import {
 import pageService from "@/services/page.service";
 import extensionService from "@/services/extension.service";
 import backendService from "@/services/backend.service";
+import { waitForPageAccount, fetchAccountName } from "@/common/mapgenie/account";
 
 import { HomePage } from "./pages/home";
 import { GameHomePage } from "./pages/game-home";
@@ -57,7 +58,14 @@ const initializeBackendUserState = async (
     // Set auth token in backend service
     const auth = getAuthToken();
     await backend.setAuthToken(auth);
-    await backend.updateUser();
+    const account = await waitForPageAccount();
+    await backend.updateUser(account);
+    if (account && !account.name) {
+      // Name lookup is optional and must not delay the profile or map boot.
+      void fetchAccountName().then(async (name) => {
+        if (name) await backend.updateAccountName(account.id, name);
+      }).catch((err) => logger.debug("Could not read account name.", err));
+    }
   } catch (err) {
     logger.debug(
       "Could not refresh MapGenie account profile; continuing with local FMG data.",
@@ -80,7 +88,9 @@ export default defineUnlistedScript(async () => {
 
     if (!pageScript) return;
 
-    void initializeBackendUserState(backend);
+    // Resolve the real account before MapPage substitutes the local profile ID.
+    const accountReady = initializeBackendUserState(backend);
+    if (pageType === "map") await accountReady;
 
     // Reload if script was already injected
     checkReload();

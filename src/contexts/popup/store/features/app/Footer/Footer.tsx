@@ -3,6 +3,7 @@ import { selectAppHomepage, selectAppAuthor } from "../appSlice";
 
 import { Version } from "./Version";
 import { Connection } from "./Connection";
+import { SaveIndicator } from "./SaveIndicator";
 
 import style from "./Footer.module.scss";
 
@@ -18,12 +19,13 @@ export const Footer = () => {
   return (
     <div className={style.footer}>
       <div className={style.left}>
-        <span className={style.author} onClick={openHomepage}>
+        <button type="button" title="Open NR2BJ's GitHub repository" className={style.author} onClick={openHomepage}>
           {author}
-        </span>
+        </button>
       </div>
       <div className="center">
         <Connection />
+        <SaveIndicator />
       </div>
       <div className="right">
         <Version />

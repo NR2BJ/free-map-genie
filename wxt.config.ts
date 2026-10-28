@@ -8,6 +8,9 @@ export default defineConfig({
   manifestVersion: 3,
   srcDir: "src",
   entrypointsDir: "contexts",
+  zip: {
+    excludeSources: ["research/**", "playwright/**", "playwright-report/**", "**/*.tsbuildinfo"],
+  },
   modules: ["@wxt-dev/module-react"],
   imports: {
     imports: [
