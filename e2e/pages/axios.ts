@@ -2,7 +2,7 @@ import { BasePage } from "./base";
 
 import type { Page } from "@playwright/test";
 import type { AxiosResponse } from "axios";
-import type { UserData } from "@src/common/storage";
+import type { UserData } from "../../src/common/storage";
 
 export class AxiosClient {
   constructor(private readonly page: Page) {}

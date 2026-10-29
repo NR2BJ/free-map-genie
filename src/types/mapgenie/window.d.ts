@@ -27,6 +27,7 @@ interface Window {
 
   // guide
   isPro?: boolean;
+  maxFoundLocations?: number | null;
   foundLocations?: Record<Id, boolean>;
   mapElement?: HTMLIFrameElement;
   // new world guide

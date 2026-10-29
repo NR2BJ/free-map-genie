@@ -43,7 +43,7 @@ export class Client {
       const axios = await waitForProperty(window, "axios");
       const gameId = axios!.defaults.headers.common["X-Game-ID"];
 
-      if (gameId) {
+      if (Number.isSafeInteger(Number(gameId)) && Number(gameId) > 0) {
         this.loginFromGame(Number(gameId));
         return;
       }
@@ -52,9 +52,10 @@ export class Client {
         "Could not get game ID from axios headers will fallback to URL-based client, notify the fmg authors to improve this"
       );
 
-      // Fallback to URL-based client
-      this.loginFromUrl(window.location.href);
     }
+    // Missing headers and delayed catalog lookups must not leave the client
+    // uninitialized when the guide installs its local-save interceptor.
+    await this.loginFromUrl(window.location.href);
   }
 
   public async loginFromUrl(url: string) {
@@ -85,6 +86,7 @@ export class Client {
 
   public async installInterceptor() {
     if (this.interceptor) return;
+    if (!this.isLoggedIn) throw new Error("Client is not logged in");
     const axios = await waitForProperty(window, "axios");
     this.interceptor = new AxiosInterceptor(axios!);
     this.registerHandlers();

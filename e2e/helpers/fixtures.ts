@@ -12,7 +12,7 @@ import { launchChromium, launchFirefox, loadStorageState } from ".";
 import { findFreeTcpPort, getFirefoxContextInfo } from "./firefox";
 import { getCredentials, login } from "./auth";
 
-import type { UserData } from "@src/common/storage";
+import type { UserData } from "../../src/common/storage";
 
 interface ExpectedUserData {
   removedKeys: string[];

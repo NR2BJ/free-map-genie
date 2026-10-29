@@ -67,6 +67,14 @@ export class GuideState {
     }
   }
 
+  public updateCheckbox(checkbox: HTMLInputElement, found: boolean) {
+    checkbox.checked = found;
+    // Modern guides render the found indicator from the row, not just :checked.
+    checkbox.parentElement?.setAttribute("data-sort", found ? "x" : "y");
+    checkbox.closest("tr, .checklist-item")?.classList.toggle("found", found);
+    checkbox.closest(".guide-item")?.classList.toggle("found", found);
+  }
+
   public markLocationFound(locationId: number, found: boolean) {
     const $checkbox = $<HTMLInputElement>(
       `.check[data-location-id="${locationId}"]`
@@ -79,17 +87,21 @@ export class GuideState {
       return;
     }
 
-    // Set checkbox state
-    $checkbox.prop("checked", found);
+    $checkbox.each((_, checkbox) => this.updateCheckbox(checkbox, found));
 
     // If the guide has its own markLocationFound function, use it
-    if (markLocationFound) {
+    if (typeof markLocationFound === "function") {
       markLocationFound({ target: $checkbox.get(0)! }, locationId, found);
       return;
     }
 
     // Otherwise, just update the state
-    state!.foundLocations[locationId] = found;
+    if (found) {
+      state!.foundLocations[locationId] = true;
+    } else {
+      delete state!.foundLocations[locationId];
+    }
+    this.updateCounts();
   }
 
   public updateCounts() {

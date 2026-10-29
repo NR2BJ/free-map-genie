@@ -75,20 +75,29 @@ export const launchFirefox = async ({
   return [context, userDataDir] as const;
 };
 
-export const resolveStorageState = async <S extends Partial<StorageState>>(
-  storageState: S
-) => {
+type StorageStateData = Exclude<StorageState, string | undefined>;
+type StorageStateInput = string | Partial<StorageStateData> | undefined;
+
+export const resolveStorageState = async (
+  storageState: StorageStateInput
+): Promise<Partial<StorageStateData>> => {
+  if (storageState === undefined) return {};
+
   if (typeof storageState === "string") {
     const data = await fs.promises.readFile(storageState, "utf-8");
-    return JSON.parse(data) as Exclude<StorageState, string>;
+    const parsed: unknown = JSON.parse(data);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error(`Invalid storage state in "${storageState}": expected an object`);
+    }
+    return parsed as Partial<StorageStateData>;
   } else {
-    return storageState as Exclude<S, string>;
+    return storageState;
   }
 };
 
-export const loadStorageState = async <S extends Partial<StorageState>>(
+export const loadStorageState = async (
   context: BrowserContext,
-  storageState: S
+  storageState: StorageStateInput
 ) => {
   const resolvedState = await resolveStorageState(storageState);
 
@@ -112,7 +121,7 @@ export const loadStorageState = async <S extends Partial<StorageState>>(
 
 export const extendStorageState = async (
   storageState: StorageState,
-  additionalState: Partial<StorageState>
+  additionalState: StorageStateInput
 ): Promise<StorageState> => {
   const resolvedState = await resolveStorageState(storageState);
   const resolvedAdditionalState = await resolveStorageState(additionalState);

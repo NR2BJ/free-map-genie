@@ -52,6 +52,9 @@ export default defineWxtModule({
     if (!options) return;
 
     options.name ??= "icons";
+    // Match Fantasticon's defaults for both generation and public path types.
+    const fontTypes = (options.fontTypes ??= ["eot", "woff2", "woff"]);
+    const assetTypes = (options.assetTypes ??= ["css", "html", "json", "ts"]);
 
     const outputDir = path.join(".icons", options.name, wxt.config.browser);
 
@@ -87,7 +90,7 @@ export default defineWxtModule({
     wxt.hook("prepare:publicPaths", async (_wxt, paths) => {
       const name = options?.name || "icons";
 
-      if (options.assetTypes?.includes("ts")) {
+      if (assetTypes.includes("ts")) {
         await generateFmgIconFont(outputDir, {
           ...options,
           assetTypes: ["ts"],
@@ -95,9 +98,11 @@ export default defineWxtModule({
         });
       }
 
-      paths.push(`assets/${name}.css`);
+      if (assetTypes.includes("css")) {
+        paths.push(`assets/${name}.css`);
+      }
 
-      for (const type of options.fontTypes) {
+      for (const type of fontTypes) {
         paths.push(`assets/${name}.${type}`);
       }
     });

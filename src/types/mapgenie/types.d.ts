@@ -70,6 +70,7 @@ declare namespace MG {
 
   declare interface Map {
     id: Int;
+    game_id?: Int;
     slug: string;
     title: string;
   }

@@ -1,6 +1,7 @@
 import { Page } from "../page";
 
 import { Client } from "@/common/client";
+import async from "@/common/async";
 import { activateBlockedMapgenieScript } from "@/common/mapgenie";
 import { waitForProperty } from "@/common/object";
 import { waitForElement } from "@/common/dom";
@@ -31,6 +32,7 @@ export class GuidePage extends Page {
 
     // Update state found locations
     state.foundLocations = data.locations;
+    logger.log(`Loaded ${Object.keys(data.locations).length} saved FMG guide locations.`);
   }
 
   private async getMapElement() {
@@ -62,9 +64,6 @@ export class GuidePage extends Page {
       suggestions: [],
     };
 
-    // Mark user as pro to unlock all features in the guide
-    window.isPro = true;
-    window.user!.hasPro = true;
   }
 
   private async getUserId() {
@@ -74,7 +73,13 @@ export class GuidePage extends Page {
     }
 
     const mapWindow = await this.getMapWindow();
-    return mapWindow?.user?.id;
+    if (!mapWindow) throw new Error("Embedded map window is not available");
+
+    // mapData can arrive before the account. Missing IDs mean still loading;
+    // an explicit null is a signed-out map and must not enable local tracking.
+    await async.waitUntil(() => mapWindow.user === null ||
+      Number.isSafeInteger(mapWindow.user?.realId ?? mapWindow.user?.id), 10000);
+    return mapWindow?.user?.realId ?? mapWindow?.user?.id;
   }
 
   private fixCheckbox(checkbox: HTMLInputElement) {
@@ -88,17 +93,7 @@ export class GuidePage extends Page {
     }
 
     const isFound = window.foundLocations![locationId] ?? false;
-
-    // Update the checkbox state
-    $this.prop("checked", isFound);
-
-    // Update the checklist item row state if applicable
-    const $td = $this.parent();
-    const $tr = $td?.parent();
-
-    if ($tr && $tr.is(".checklist-item")) {
-      $tr.toggleClass("found", isFound);
-    }
+    this.state.updateCheckbox(checkbox, Boolean(isFound));
   }
 
   private fixState(checkbox: HTMLInputElement) {
@@ -151,6 +146,7 @@ export class GuidePage extends Page {
     await this.setupUser(userId);
 
     if (userId === undefined) {
+      logger.log("Guide tracking inactive: no signed-in map account.");
       if (this.isTarkovQuest17Page) {
         await activateBlockedMapgenieScript("TarkovQuestToolWidget");
       }
@@ -168,13 +164,19 @@ export class GuidePage extends Page {
 
     this.fixCheckboxes();
 
+    // Enable unlimited tracking only after requests can be saved locally.
+    await this.client.installInterceptor();
+    window.isPro = true;
+    window.user!.hasPro = true;
+    window.maxFoundLocations = Infinity;
+
     // Activate blocked Mapgenie scripts
     if (this.isTarkovQuest17Page) {
       await activateBlockedMapgenieScript("TarkovQuestToolWidget");
     }
 
     await this.setupEventListeners();
-    await this.client.installInterceptor();
+    logger.log("Guide tracking connected to local FMG saves.");
   }
 
   public async info(): Promise<Record<string, any>> {

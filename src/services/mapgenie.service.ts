@@ -2,6 +2,7 @@ import axios from "axios";
 import { setupCache } from "axios-cache-interceptor";
 import { browser } from "wxt/browser";
 import { fetchGameCatalog } from "@/common/mapgenie/gameCatalog";
+import { selectMapFromGame } from "@/common/mapgenie/mapResponse";
 
 import { createService, Memoize, type ProxiedObject } from "@/common/messaging";
 
@@ -64,7 +65,8 @@ class MapgenieService {
   public async fetchGame(gameId: number | string): Promise<MG.Api.GameFull> {
     try {
       const { data } = await this.axios.get<MG.Api.GameFull>(
-        `/games/${gameId}/full`
+        `/games/${gameId}/full`,
+        { timeout: 20000 }
       );
       return data;
     } catch (error) {
@@ -86,10 +88,19 @@ class MapgenieService {
 
   @Memoize()
   public async fetchMap(mapId: number | string) {
-    const { data } = await this.axios.get<MG.Api.MapFull>(
-      `/maps/${mapId}/full`
+    const id = Number(mapId);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      throw new Error("Invalid map ID.");
+    }
+    const { data: info } = await this.axios.get<MG.Api.Map>(
+      `/maps/${id}`,
+      { timeout: 15000 }
     );
-    return data;
+    if (info?.id !== id || !Number.isSafeInteger(info.game_id) || info.game_id <= 0) {
+      throw new Error(`Invalid metadata for map ${id}.`);
+    }
+    const game = await this.fetchGame(info.game_id);
+    return selectMapFromGame(game, info.game_id, id);
   }
 
   @Memoize()

@@ -77,6 +77,10 @@ export const setFirefoxExtensionInfo = (
 
 export const getFirefoxContextInfo = (
   context: BrowserContext
-): FirefoxExtensionInfo | undefined => {
-  return firefoxExtensionContexts.get(context);
+): FirefoxExtensionInfo => {
+  const info = firefoxExtensionContexts.get(context);
+  if (!info) {
+    throw new Error("Firefox extension information is not initialized for this browser context");
+  }
+  return info;
 };

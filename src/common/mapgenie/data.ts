@@ -70,10 +70,14 @@ const normalizeTileSet = (
 ): MG.TileSet => {
   const path = tileSet.path ?? originalTileSet?.path;
   const extension = tileSet.extension ?? originalTileSet?.extension ?? "jpg";
-  const pattern =
+  const suppliedPattern =
     tileSet.pattern ??
-    (originalTileSet?.path === path ? originalTileSet?.pattern : undefined) ??
-    getFallbackTilePattern(path, extension, swapTileCoordinates);
+    (originalTileSet?.path === path ? originalTileSet?.pattern : undefined);
+  const pattern = suppliedPattern
+    ? (swapTileCoordinates
+        ? suppliedPattern.replace(/\{([xy])\}/g, (_, axis) => axis === "x" ? "{y}" : "{x}")
+        : suppliedPattern)
+    : getFallbackTilePattern(path, extension, swapTileCoordinates);
 
   return {
     ...originalTileSet,
@@ -128,16 +132,17 @@ export const loadMapData = (
   const originalMapConfig = window.mapData.mapConfig;
   const locations = getLocations(map);
   const categories = getCategories(map);
+  const mapConfig = preserveMapConfig
+    ? originalMapConfig
+    : normalizeMapConfig(map.config, originalMapConfig, {
+        swapTileCoordinates,
+      });
 
   window.mapData.map = map;
   window.mapData.groups = map.groups;
   window.mapData.locations = locations;
   window.mapData.categories = categories;
-  window.mapData.mapConfig = preserveMapConfig
-    ? originalMapConfig
-    : normalizeMapConfig(map.config, originalMapConfig, {
-        swapTileCoordinates,
-      });
+  window.mapData.mapConfig = mapConfig;
   window.mapData.regions = map.regions;
 
   window.initialZoom = map.config.initial_zoom;

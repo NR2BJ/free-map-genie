@@ -88,8 +88,9 @@ declare namespace MG.Api {
     maps: Map[];
   }
 
-  declare interface MapFullForGame extends MapFull {
+  declare interface MapFullForGame extends Omit<MapFull, "game"> {
     config: MapConfig;
+    game?: Game;
   }
 
   declare interface GameFull extends Game {

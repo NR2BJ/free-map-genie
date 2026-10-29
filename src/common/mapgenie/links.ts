@@ -106,15 +106,9 @@ export const fixMapLinks = async (mapgenie: mapgenieService.Instance) => {
 
   if (!$proSidebarLinks.length) return;
 
-  const parmas = new URLSearchParams(window.location.search);
-  if (parmas.has("fmgMapId")) {
-    $("a.map-link.selected").toggleClass("selected", false);
-  }
-
-  const currentMapId = window.mapData?.map.id;
-  const game = currentMapId
-    ? (await mapgenie.fetchMap(currentMapId)).game
-    : await mapgenie.fetchGameInfo(window.game!.id);
+  const gameId = window.game?.id ?? window.mapData?.map.game_id;
+  if (!gameId) return;
+  const game = await mapgenie.fetchGameInfo(gameId);
 
   const freeMapUrl = getFreeLinkUrl($sidebarLinks, game);
   if (!freeMapUrl) {
@@ -126,6 +120,10 @@ export const fixMapLinks = async (mapgenie: mapgenieService.Instance) => {
     ...game.maps,
     ...(window.mapData?.maps ?? []),
   ]);
+
+  if (new URLSearchParams(window.location.search).has("fmgMapId")) {
+    $("a.map-link.selected").toggleClass("selected", false);
+  }
 
   $proSidebarLinks.each((_, link) => fixLink(link, mapByTitle, freeMapUrl));
   $proHeaderLinks.each((_, link) => fixLink(link, mapByTitle, freeMapUrl));
