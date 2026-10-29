@@ -1,12 +1,12 @@
-# FMG 3.0.14 Release Assets
+# FMG 3.0.15 Release Assets
 
 ## Files
 
-- `fmg-3.0.14-chrome.zip`
+- `fmg-3.0.15-chrome.zip`
   - Upload this ZIP to the Chrome Web Store Developer Dashboard.
   - For manual testing, unzip it and load the folder from `chrome://extensions` with Developer mode enabled.
 
-- `fmg-3.0.14-firefox.xpi`
+- `fmg-3.0.15-firefox.xpi`
   - Mozilla-signed Firefox package.
   - Uses the fork-specific add-on ID `free-map-genie-nr2bj@nr2bj.github.io`.
 

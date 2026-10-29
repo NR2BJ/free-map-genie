@@ -160,3 +160,46 @@ test("style timeout removes listeners and leaves stored data unchanged", async (
   assert.equal(f.actions.length, 0);
   assert.deepEqual(f.saved, { 1: true, 2: true, 3: false, 999: true });
 });
+
+test("late map data restores saved and imported records after each page reload", async () => {
+  for (const legacy of [false, true]) {
+    for (let reload = 0; reload < 2; reload++) {
+      const f = fixture({ loaded: false, legacy });
+      const saved = { locations: { 1: true, 2: true, 3: false, 999: true },
+        notes: [], presets: [], trackedCategoryIds: [] };
+      const original = structuredClone(saved);
+      window.mapData.map = { id: 10 };
+      window.mapData.categories = {};
+      f.state.map = {};
+      f.state.user.foundLocations = {};
+      f.state.user.foundLocationsCount = 0;
+      f.page.client = { migrate: async () => {}, getData: async () => structuredClone(saved) };
+      await f.page.loadUserData();
+      assert.deepEqual(window.user.locations, {});
+      f.page.lockProData();
+      f.state.user.foundLocations = window.user.locations;
+      const pending = f.page.syncSavedLocationsToMap();
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(f.actions.length, 0);
+      f.state.map[legacy ? "locationById" : "locationsById"] = { 1: {}, 2: {}, 3: {} };
+      window.mapManager.map.loaded = () => true;
+      f.listeners.get("load")();
+      await pending;
+      assert.deepEqual(f.visual, [[1, true], [2, true]]);
+      assert.deepEqual(window.user.locations, { 1: true, 2: true });
+      assert.equal(f.state.user.foundLocationsCount, 2);
+      await f.page.syncSavedLocationsToMap();
+      assert.equal(f.state.user.foundLocationsCount, 2);
+      assert.deepEqual(saved, original);
+    }
+  }
+});
+
+test("an explicitly empty runtime map does not restore stale page markers", async () => {
+  const f = fixture();
+  window.mapData.locations = [{ id: 1 }, { id: 2 }];
+  f.state.map.locationsById = {};
+  await f.page.syncSavedLocationsToMap();
+  assert.deepEqual(f.visual, []);
+  assert.deepEqual(f.actions, []);
+});

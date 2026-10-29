@@ -14,6 +14,7 @@ import { prepareMapDataResponseOverride } from "@/common/mapgenie/mapDataRespons
 export class MapPage extends Page {
   private client = new Client();
   private ui = new UI();
+  private savedLocationsForRestore?: Record<string, boolean>;
 
   private async withTimeout<T>(
     promise: Promise<T>,
@@ -96,6 +97,10 @@ export class MapPage extends Page {
     await this.client.migrate();
     const data = await this.client.getData();
 
+    // The initial page can omit markers until its asynchronous map-data request.
+    // Keep the full save for restoration once the runtime map is ready.
+    this.savedLocationsForRestore = { ...data.locations };
+
     const pageLocations = window.mapData!.locations ?? [];
     const locationsById = Object.fromEntries(
       pageLocations.map((loc) => [loc.id, loc])
@@ -125,18 +130,17 @@ export class MapPage extends Page {
   }
 
   private getSavedLocationIdsForCurrentMap() {
-    const savedLocationIds = Object.keys(window.user?.locations ?? {})
-      .filter((id) => window.user!.locations[id])
+    const saved = this.savedLocationsForRestore ?? window.user?.locations ?? {};
+    const savedLocationIds = Object.keys(saved)
+      .filter((id) => saved[id])
       .map(Number);
 
     const mapState = window.store?.getState().map;
-    const stateLocationIds = Object.keys(
-      mapState?.locationsById ?? mapState?.locationById ?? {}
-    ).map(Number);
+    const stateLocations = mapState?.locationsById ?? mapState?.locationById;
 
     const currentMapLocationIds =
-      stateLocationIds.length > 0
-        ? stateLocationIds
+      stateLocations != null
+        ? Object.keys(stateLocations).map(Number)
         : (window.mapData?.locations ?? []).map((loc) => loc.id);
 
     if (currentMapLocationIds.length === 0) return [];
@@ -213,8 +217,6 @@ export class MapPage extends Page {
     if (!store) return;
 
     const locationIds = this.getSavedLocationIdsForCurrentMap();
-    if (locationIds.length === 0) return;
-
     const state = store.getState();
     const foundLocations = state.user.foundLocations ?? {};
     const missingLocationIds = locationIds.filter(
@@ -230,6 +232,17 @@ export class MapPage extends Page {
         },
       } as any);
     }
+
+    // Update the locked object only after dispatch: Redux may share this object,
+    // and pre-populating it would suppress the counter update for restored IDs.
+    if (this.savedLocationsForRestore && window.user) {
+      for (const id of Object.keys(window.user.locations)) {
+        delete window.user.locations[id];
+      }
+      for (const id of locationIds) window.user.locations[id] = true;
+      this.savedLocationsForRestore = undefined;
+    }
+    if (locationIds.length === 0) return;
 
     // Redux counters and MapLibre feature states are separate. Reapply every
     // saved marker visually, even when Redux already counted it during boot.
