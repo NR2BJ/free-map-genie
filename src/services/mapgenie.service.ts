@@ -88,7 +88,7 @@ class MapgenieService {
   }
 
   @Memoize()
-  public async fetchMap(mapId: number | string) {
+  public async fetchMapInfo(mapId: number | string) {
     const id = Number(mapId);
     if (!Number.isSafeInteger(id) || id <= 0) {
       throw new Error("Invalid map ID.");
@@ -100,9 +100,31 @@ class MapgenieService {
     if (info?.id !== id || !Number.isSafeInteger(info.game_id) || info.game_id <= 0) {
       throw new Error(`Invalid metadata for map ${id}.`);
     }
+    const game = (info as MG.Api.Map & { game?: MG.Api.Game }).game;
+    return {
+      id: info.id,
+      slug: info.slug,
+      title: info.title,
+      game_id: info.game_id,
+      premium: Boolean(info.premium),
+      locations_count: info.locations_count,
+      ign_slug: game?.ign_slug ?? null,
+    };
+  }
+
+  /**
+   * `proLocations` lets the caller supply premium markers it fetched itself.
+   * Firefox content scripts cannot reach mollusk.apis.ign.com without an
+   * opt-in host permission, while the page context can, so map pages fetch
+   * them there and pass them in.
+   */
+  // Not memoized: the result depends on the caller-supplied markers, while the
+  // expensive parts (fetchMapInfo, fetchGame) are cached individually.
+  public async fetchMap(mapId: number | string, proLocations?: MG.Location[]) {
+    const info = await this.fetchMapInfo(mapId);
     const game = await this.fetchGame(info.game_id);
-    await this.fillPremiumLocations(game, info);
-    return selectMapFromGame(game, info.game_id, id);
+    await this.fillPremiumLocations(game, info, proLocations);
+    return selectMapFromGame(game, info.game_id, info.id);
   }
 
   /**
@@ -112,7 +134,11 @@ class MapgenieService {
    * The same rows are available through the IGN wikimaps GraphQL API, so fill
    * them in before `selectMapFromGame` validates the map.
    */
-  private async fillPremiumLocations(game: MG.Api.GameFull, info: MG.Api.Map) {
+  private async fillPremiumLocations(
+    game: MG.Api.GameFull,
+    info: { id: number; slug: string; locations_count: number },
+    providedLocations?: MG.Location[]
+  ) {
     const map = game.maps?.find((candidate) => candidate.id === info.id);
     if (!map) return;
 
@@ -136,14 +162,18 @@ class MapgenieService {
     }
 
     try {
-      const locations = await fetchProLocations({
-        objectSlug,
-        mapSlug,
-        mapId: info.id,
-      });
+      const locations =
+        providedLocations && providedLocations.length > 0
+          ? providedLocations
+          : await fetchProLocations({
+              objectSlug,
+              mapSlug,
+              mapId: info.id,
+            });
       if (locations.length === 0) {
-        logger.warn(`IGN returned no markers for map ${info.id} (${objectSlug}/${mapSlug}).`);
-        return;
+        throw new Error(
+          `IGN returned no markers for ${objectSlug}/${mapSlug}.`
+        );
       }
 
       const byCategory = new Map<number, MG.Location[]>();
@@ -167,7 +197,14 @@ class MapgenieService {
         logger.log(`Recovered ${locations.length} premium markers for map ${info.id}.`);
       }
     } catch (error) {
-      logger.warn(`Could not recover premium markers for map ${info.id}.`, error);
+      // Surface the transport error instead of the generic "no markers" check:
+      // on filtered networks (ad blockers, proxies) this string is the only
+      // clue that the IGN request never reached the API.
+      const reason = error instanceof Error ? error.message : String(error);
+      logger.error(`Could not recover premium markers for map ${info.id}.`, error);
+      throw new Error(
+        `Premium marker recovery failed for map ${info.id} (${objectSlug}/${mapSlug}): ${reason}`
+      );
     }
   }
 

@@ -69,7 +69,10 @@ export const searchIgnMarkers = async (
       signal: controller.signal,
     });
     if (!response.ok) {
-      throw new Error(`IGN marker search failed with HTTP ${response.status}.`);
+      const detail = (await response.text().catch(() => "")).slice(0, 160);
+      throw new Error(
+        `IGN marker search failed with HTTP ${response.status}${detail ? `: ${detail}` : ""}`
+      );
     }
     const payload = (await response.json()) as {
       data?: { mapGenieSearch?: { markers?: IgnMapMarker[] } };
@@ -130,6 +133,17 @@ export const toProLocations = (
 export const fetchProLocations = async (
   options: FetchProMarkersOptions
 ): Promise<MG.Location[]> => {
-  const markers = await fetchIgnMarkers(options.objectSlug, options.mapSlug);
-  return toProLocations(markers, options.mapId);
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const markers = await fetchIgnMarkers(options.objectSlug, options.mapSlug);
+      return toProLocations(markers, options.mapId);
+    } catch (error) {
+      lastError = error;
+      if (attempt === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 };

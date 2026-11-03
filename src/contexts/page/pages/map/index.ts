@@ -10,6 +10,7 @@ import { fixMapLinks } from "@/common/mapgenie";
 import { LazyGetter } from "lazy-get-decorator";
 import { showMapLoadError } from "@/common/mapgenie/mapLoadError";
 import { prepareMapDataResponseOverride } from "@/common/mapgenie/mapDataResponse";
+import { fetchProLocations } from "@/common/mapgenie/proMarkers";
 
 export class MapPage extends Page {
   private client = new Client();
@@ -21,10 +22,12 @@ export class MapPage extends Page {
     timeout: number,
     message: string
   ) {
-    let handle: number | undefined;
+    let handle: ReturnType<typeof setTimeout> | undefined;
 
+    // Bare timers resolve to the script global in the browser and to the test
+    // global in unit tests, where `window` is only a partial stub.
     const timeoutPromise = new Promise<never>((_resolve, reject) => {
-      handle = window.setTimeout(
+      handle = setTimeout(
         () => reject(new Error(`${message} timed out after ${timeout}ms.`)),
         timeout
       );
@@ -34,7 +37,7 @@ export class MapPage extends Page {
       return await Promise.race([promise, timeoutPromise]);
     } finally {
       if (handle !== undefined) {
-        window.clearTimeout(handle);
+        clearTimeout(handle);
       }
     }
   }
@@ -291,7 +294,15 @@ export class MapPage extends Page {
 
   private async unlockMapLinks() {
     try {
-      await fixMapLinks(this.client.mapgenie);
+      // This is a cosmetic link rewrite that needs a backend round trip. It must
+      // never hold the boot: on Firefox the call waits for the backend service to
+      // answer, and a slow or missing responder used to stall the map forever
+      // because the map script is only replayed after this returns.
+      await this.withTimeout(
+        fixMapLinks(this.client.mapgenie),
+        8000,
+        "Map link unlock"
+      );
     } catch (err) {
       logger.error("Failed to unlock map links, loading map anyway.", err);
     }
@@ -309,8 +320,35 @@ export class MapPage extends Page {
     return mapId;
   }
 
+  /**
+   * Premium markers are fetched here, in the page context, because a Firefox
+   * content script has no cross-origin access to the IGN API without an opt-in
+   * host permission, while page-origin requests are CORS-allowed. The service
+   * falls back to its own request when this returns nothing.
+   */
+  private async loadProLocationsForMap(mapId: number) {
+    try {
+      const info = await this.client.mapgenie.fetchMapInfo(mapId);
+      if (!(info.locations_count > 0) || !info.ign_slug) return undefined;
+      const locations = await fetchProLocations({
+        objectSlug: info.ign_slug,
+        mapSlug: info.slug,
+        mapId,
+      });
+      logger.log(`Fetched ${locations.length} premium markers in the page context.`);
+      return locations;
+    } catch (err) {
+      logger.warn(
+        "Could not fetch premium markers in the page context; falling back to the backend request.",
+        err
+      );
+      return undefined;
+    }
+  }
+
   private async loadMapDataForMapId(mapId: number) {
-    const map = await this.client.mapgenie.fetchMap(mapId);
+    const proLocations = await this.loadProLocationsForMap(mapId);
+    const map = await this.client.mapgenie.fetchMap(mapId, proLocations);
     const gameId = window.game?.id ?? window.mapData?.map.game_id;
     if (map.id !== mapId || map.game_id !== gameId) {
       throw new Error("Requested map does not belong to this game's page.");
@@ -349,7 +387,9 @@ export class MapPage extends Page {
 
   private async loadRemoteMapData() {
     try {
-      await this.loadMapData();
+      // fetchMap is a backend round trip; bound it so a silent responder cannot
+      // keep the map script from ever being replayed.
+      await this.withTimeout(this.loadMapData(), 20000, "Remote map data loading");
     } catch (err) {
       // Never label the original page's map as a successfully loaded target.
       showMapLoadError();
@@ -412,13 +452,37 @@ export class MapPage extends Page {
   private async activateMapScript() {
     if (window.mapManager) return;
 
+    // `/js/map.` skips maplibre.*.js, which also contains "js/map".
+    const tagCount = document.querySelectorAll(
+      'script[src*="cdn.mapgenie.io/js/map."]'
+    ).length;
+
     const activated = await activateBlockedMapgenieScript("map");
     if (!activated) {
-      logger.warn("MapGenie map script not found.");
+      // No script tag to replay: the page either never requested map.js or the
+      // tag was removed. Nothing else in the boot flow can recover this.
+      logger.error(
+        `MapGenie map script tag not found (tags=${tagCount}); the map cannot boot.`
+      );
+      showMapLoadError();
       return;
     }
 
-    await waitForProperty(window, "mapManager", 30000);
+    try {
+      await waitForProperty(window, "mapManager", 15000);
+      logger.log("MapGenie map script started.", { tagCount });
+    } catch (error) {
+      // The replayed URL was fetched but never produced a runtime: an ad blocker
+      // or tracker protection is the usual cause, since the same request is
+      // already being rewritten by declarativeNetRequest.
+      logger.error(
+        `MapGenie map script did not start (tags=${tagCount}). ` +
+          "Check the network panel for a blocked cdn.mapgenie.io/js/map request " +
+          "and allow mapgenie.io in content blockers.",
+        error
+      );
+      showMapLoadError();
+    }
   }
 
   private async installRequestInterceptor() {
@@ -435,11 +499,14 @@ export class MapPage extends Page {
 
   public async start() {
     await waitForProperty(window, "mapData");
+    logger.log("Map boot: page data ready.");
 
     await this.setupUser();
+    logger.log("Map boot: user state ready.");
 
     // Load map data and heatmaps for pro maps and maps with heatmaps
     await this.loadRemoteMapData();
+    logger.log("Map boot: remote map data handled.");
 
     // MapGenie stores tracked categories per game. Only pass categories that
     // exist on this map or its map script may fail during initialization.
@@ -455,8 +522,10 @@ export class MapPage extends Page {
 
     // Unlock pro map links
     await this.unlockMapLinks();
+    logger.log("Map boot: map links handled.");
 
     if (!window.user) {
+      logger.log("Map boot: replaying the map script (signed out).");
       await this.activateMapScript();
 
       // In development mode, auto-login and load map data to speed up testing
@@ -491,6 +560,7 @@ export class MapPage extends Page {
 
     this.lockProData();
 
+    logger.log("Map boot: replaying the map script.");
     await this.activateMapScript();
     await this.installRequestInterceptor();
     await this.syncSavedLocationsToMap();

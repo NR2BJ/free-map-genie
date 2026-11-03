@@ -1,20 +1,20 @@
-# FMG 3.0.16 Release Assets
+# FMG 3.0.17 Release Assets
 
 ## Files
 
-- `fmg-3.0.16-chrome.zip`
+- `fmg-3.0.17-chrome.zip`
   - Upload this ZIP to the Chrome Web Store Developer Dashboard.
   - For manual testing, unzip it and load the folder from `chrome://extensions` with Developer mode enabled.
 
-- `fmg-3.0.16-firefox.xpi`
+- `fmg-3.0.17-firefox.xpi`
   - Mozilla-signed Firefox package (`yarn sign:firefox`).
   - Uses the fork-specific add-on ID `free-map-genie-nr2bj@nr2bj.github.io`.
 
-- `fmg-3.0.16-sources.zip`
+- `fmg-3.0.17-sources.zip`
   - Source archive for the AMO review form; the shipped bundle is minified.
 
 - `SHA256SUMS.txt`
-  - Checksums for the three artifacts above.
+  - Checksums for the artifacts above.
 
 ## Notes
 

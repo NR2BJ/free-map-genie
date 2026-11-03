@@ -46,6 +46,7 @@ const { MapPage } = await loadModule("../src/contexts/page/pages/map/index.ts", 
   "@/common/object": "export const waitForProperty = async (obj, key) => obj[key];",
   "@/common/mapgenie/mapLoadError": "export const showMapLoadError = () => {};",
   "@/common/mapgenie/mapDataResponse": "export const prepareMapDataResponseOverride = () => {};",
+  "@/common/mapgenie/proMarkers": "export const fetchProLocations = async () => [];",
   "lazy-get-decorator": "export const LazyGetter = () => () => {};",
 });
 

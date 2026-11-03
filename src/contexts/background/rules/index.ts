@@ -82,11 +82,30 @@ export class Rules {
   }
 
   public async enable() {
-    await this.manager.disable([2, 3]);
-    await this.manager.enable([1, ...this.blockedScriptRuleIds]);
+    try {
+      await this.manager.disable([2, 3]);
+      await this.manager.enable([1, ...this.blockedScriptRuleIds]);
+    } catch (error) {
+      // A rules failure must not abort the background boot: MapGenie pages can
+      // still be inspected, and this message is what the popup diagnostics and
+      // the background console need to point at the real cause.
+      logger.error(
+        [
+          "Could not install the request rules, MapGenie scripts stay unblocked.",
+          "Check that the extension has site access for mapgenie.io/cdn.mapgenie.io",
+          "and that declarativeNetRequest is available (Firefox 113+ / MV3).",
+          `declarativeNetRequest=${browser.declarativeNetRequest !== undefined}`,
+        ].join(" "),
+        error
+      );
+    }
   }
 
-  public disable() {
-    return this.manager.disable([2, 3]);
+  public async disable() {
+    try {
+      await this.manager.disable([2, 3]);
+    } catch (error) {
+      logger.warn("Could not remove the request rules.", error);
+    }
   }
 }
