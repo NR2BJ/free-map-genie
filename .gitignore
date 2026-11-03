@@ -33,3 +33,7 @@ research/
 
 # Environment files
 .env
+
+# Built extension packages (uploaded as GitHub release assets)
+release-assets/*.zip
+release-assets/*.xpi

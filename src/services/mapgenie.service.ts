@@ -3,6 +3,7 @@ import { setupCache } from "axios-cache-interceptor";
 import { browser } from "wxt/browser";
 import { fetchGameCatalog } from "@/common/mapgenie/gameCatalog";
 import { selectMapFromGame } from "@/common/mapgenie/mapResponse";
+import { fetchProLocations } from "@/common/mapgenie/proMarkers";
 
 import { createService, Memoize, type ProxiedObject } from "@/common/messaging";
 
@@ -100,7 +101,74 @@ class MapgenieService {
       throw new Error(`Invalid metadata for map ${id}.`);
     }
     const game = await this.fetchGame(info.game_id);
+    await this.fillPremiumLocations(game, info);
     return selectMapFromGame(game, info.game_id, id);
+  }
+
+  /**
+   * MapGenie strips premium-map markers from every public endpoint for sessions
+   * without a PRO entitlement: `/games/{id}/full` still returns the map record,
+   * its tile sets and its categories, but each category's `locations` is empty.
+   * The same rows are available through the IGN wikimaps GraphQL API, so fill
+   * them in before `selectMapFromGame` validates the map.
+   */
+  private async fillPremiumLocations(game: MG.Api.GameFull, info: MG.Api.Map) {
+    const map = game.maps?.find((candidate) => candidate.id === info.id);
+    if (!map) return;
+
+    const groups = map.groups ?? [];
+    const present = groups.reduce(
+      (total, group) =>
+        total +
+        (group.categories ?? []).reduce(
+          (count, category) => count + (category.locations?.length ?? 0),
+          0
+        ),
+      0
+    );
+    if (present > 0 || !(info.locations_count > 0)) return;
+
+    const objectSlug = game.ign_slug;
+    const mapSlug = map.slug ?? info.slug;
+    if (!objectSlug || !mapSlug) {
+      logger.warn(`Map ${info.id} has no markers and no IGN slug to recover them from.`);
+      return;
+    }
+
+    try {
+      const locations = await fetchProLocations({
+        objectSlug,
+        mapSlug,
+        mapId: info.id,
+      });
+      if (locations.length === 0) {
+        logger.warn(`IGN returned no markers for map ${info.id} (${objectSlug}/${mapSlug}).`);
+        return;
+      }
+
+      const byCategory = new Map<number, MG.Location[]>();
+      for (const location of locations) {
+        const bucket = byCategory.get(location.category_id) ?? [];
+        bucket.push(location);
+        byCategory.set(location.category_id, bucket);
+      }
+      for (const group of groups) {
+        for (const category of group.categories ?? []) {
+          category.locations = byCategory.get(category.id) ?? [];
+        }
+      }
+
+      const missing = info.locations_count - locations.length;
+      if (missing > 0) {
+        logger.warn(
+          `Recovered ${locations.length}/${info.locations_count} premium markers for map ${info.id}.`
+        );
+      } else {
+        logger.log(`Recovered ${locations.length} premium markers for map ${info.id}.`);
+      }
+    } catch (error) {
+      logger.warn(`Could not recover premium markers for map ${info.id}.`, error);
+    }
   }
 
   @Memoize()

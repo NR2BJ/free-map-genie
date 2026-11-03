@@ -2,7 +2,7 @@
   "name": "fmg",
   "description": "Enhance mapgenie.io features.",
   "private": true,
-  "version": "3.0.15",
+  "version": "3.0.16",
   "author": "NR2BJ",
   "contributors": ["V1P3R"],
   "homepage": "https://github.com/NR2BJ/free-map-genie",
@@ -18,7 +18,9 @@
     "zip:all": "run-p zip zip:firefox",
     "compile": "tsc --noEmit",
     "postinstall": "wxt prepare",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "sign:firefox": "node tools/sign-firefox.mjs",
+    "release:pack": "yarn zip && yarn zip:firefox"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
