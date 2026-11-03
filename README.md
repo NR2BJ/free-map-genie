@@ -188,6 +188,27 @@ Firefox ZIP can be renamed to `.xpi` but only installs permanently on Firefox
 Developer Edition/Nightly with `xpinstall.signatures.required=false`, or as a
 temporary add-on via `about:debugging`.
 
+### Windows / fresh clone
+
+The repository is self-contained: `yarn install` (Node 20, see `.nvmrc`) is all
+that is needed, and `tools/sign-firefox.mjs` handles the `npx.cmd` invocation on
+Windows.
+
+```powershell
+git clone https://github.com/NR2BJ/free-map-genie.git
+cd free-map-genie
+yarn install
+yarn build            # .output/chrome-mv3
+yarn build:firefox    # .output/firefox-mv3
+yarn zip; yarn zip:firefox
+$env:WEB_EXT_API_KEY="user:12345678:123"
+$env:WEB_EXT_API_SECRET="..."
+yarn sign:firefox     # release-assets/fmg-<version>-firefox.xpi + SHA256SUMS.txt
+```
+
+Built packages, `research/` dumps and `node_modules/` stay untracked; release
+binaries live on the GitHub release for their tag.
+
 ## Credits
 
 Original project: [V1P3R-FMG/free-map-genie](https://github.com/V1P3R-FMG/free-map-genie)

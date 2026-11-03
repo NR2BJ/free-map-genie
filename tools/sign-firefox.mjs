@@ -92,6 +92,7 @@ const main = async () => {
   await mkdir(releaseDir, { recursive: true });
 
   console.log(`Signing ${sourceDir} on AMO (${channel})...`);
+  // Windows resolves npx through cmd.exe; the API key/secret are plain tokens.
   execFileSync(
     "npx",
     [
@@ -109,7 +110,7 @@ const main = async () => {
       "--api-secret",
       apiSecret,
     ],
-    { stdio: "inherit", cwd: repoRoot }
+    { stdio: "inherit", cwd: repoRoot, shell: process.platform === "win32" }
   );
 
   const xpi = (await readdir(artifactsDir)).find((name) => name.endsWith(".xpi"));

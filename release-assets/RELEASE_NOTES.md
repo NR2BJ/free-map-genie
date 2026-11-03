@@ -28,6 +28,7 @@ Fixes premium-map marker recovery on Firefox, where the extension's own request 
 
 ```text
 90aaa36886c06a3660dec40e12fff689e6df23f8c123db64562a9ccdae8bdde4  fmg-3.0.17-chrome.zip
+e70ae79b030c1ec56ee2bd4169db68baf934873d3202441dc44f0333167c923f  fmg-3.0.17-firefox.xpi
 018bf277a6461a651d434e77bf261e6f2673c50d3efd1c0b9d715e5ad2106438  fmg-3.0.17-sources.zip
 ```
 
